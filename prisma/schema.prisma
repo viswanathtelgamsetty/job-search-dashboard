@@ -1,0 +1,197 @@
+// Prisma schema for Job Market Radar
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobStatus {
+  DISCOVERED
+  SAVED
+  APPLIED
+  SCREENING
+  TECHNICAL
+  FINAL
+  OFFER
+  REJECTED
+  IGNORED
+}
+
+enum RemoteType {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+enum TravelType {
+  INTERNATIONAL
+  CLIENT_SITE
+  OCCASIONAL
+  RELOCATION
+  NONE
+  UNKNOWN
+}
+
+enum EventType {
+  STATUS_CHANGE
+  NOTE_ADDED
+  INTERVIEW_SCHEDULED
+  FOLLOW_UP
+  OFFER_RECEIVED
+}
+
+model Company {
+  id                    String        @id @default(cuid())
+  name                  String        @unique
+  normalizedName        String        @unique
+  website               String?
+  careersUrl            String?
+  industry              String?
+  targetRoleFamilies    String[]      @default([])
+  internationalPresence String[]      @default([])
+  travelPossibility     String?
+  notes                 String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  jobs                  Job[]
+  applications          Application[]
+
+  @@index([normalizedName])
+}
+
+model JobSource {
+  id          String               @id @default(cuid())
+  name        String               @unique // e.g. "remotive", "arbeitnow", "greenhouse", "adzuna"
+  displayName String
+  enabled     Boolean              @default(true)
+  apiEndpoint String?
+  lastSyncAt  DateTime?
+  jobsFound   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+
+  references  JobSourceReference[]
+}
+
+model Job {
+  id                 String               @id @default(cuid())
+  title              String
+  normalizedTitle    String
+  companyName        String
+  normalizedCompany  String
+  location           String
+  remoteType         RemoteType           @default(HYBRID)
+
+  // Salary
+  salaryMin          Float?
+  salaryMax          Float?
+  currency           String?              @default("INR")
+  salaryLpaMin       Float?
+  salaryLpaMax       Float?
+  salaryDisclosed    Boolean              @default(false)
+
+  // Experience
+  experienceMin      Int?
+  experienceMax      Int?
+
+  // Skills & Role Classification
+  skills             String[]             @default([])
+  roleFamily         String?
+
+  // Travel Requirements
+  travelType         TravelType           @default(UNKNOWN)
+  travelPercentage   Int?
+  travelDestinations String[]             @default([])
+  travelNotes        String?
+
+  description        String?              @db.Text
+  url                String
+  postedAt           DateTime?
+  discoveredAt       DateTime             @default(now())
+  isDemo             Boolean              @default(false)
+
+  // Matching snapshot
+  matchScore         Int                  @default(0)
+  matchReasons       String[]             @default([])
+
+  // Relationships
+  companyId          String?
+  company            Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  sources            JobSourceReference[]
+  application        Application?
+
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([normalizedCompany, normalizedTitle])
+  @@index([discoveredAt])
+  @@index([travelType])
+  @@index([matchScore])
+}
+
+model JobSourceReference {
+  id           String    @id @default(cuid())
+  jobId        String
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceId     String?
+  source       JobSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  sourceName   String
+  sourceUrl    String
+  discoveredAt DateTime  @default(now())
+
+  @@index([jobId])
+}
+
+model Application {
+  id              String             @id @default(cuid())
+  jobId           String             @unique
+  job             Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  companyId       String?
+  company         Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  status          JobStatus          @default(SAVED)
+  appliedAt       DateTime?
+  notes           String?            @db.Text
+  nextStep        String?
+  nextStepDate    DateTime?
+
+  events          ApplicationEvent[]
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([status])
+}
+
+model ApplicationEvent {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          EventType
+  fromStatus    JobStatus?
+  toStatus      JobStatus?
+  notes         String?     @db.Text
+  eventDate     DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+model SearchProfile {
+  id                          String       @id @default(cuid())
+  name                        String       @default("Primary Profile")
+  experienceYears             Int          @default(12)
+  minSalaryLpa                Float        @default(35.0)
+  targetLocations             String[]     @default(["Hyderabad", "India", "Remote India", "International Remote"])
+  targetRoleFamilies          String[]     @default(["Senior Technical Lead", "Frontend Architect", "UI Architect", "Digital Experience Architect", "Technical Architect", "Solutions Architect", "Technical Consultant", "Implementation Consultant", "Professional Services Engineer", "Solutions Engineer", "Enterprise Integration Consultant", "CMS / Digital Experience Consultant", "Commerce Consultant"])
+  targetSkills                String[]     @default(["React", "Next.js", "TypeScript", "Angular", "Contentful", "Headless CMS", "Digital Experience", "Frontend architecture", "Commerce integrations"])
+  preferredTravelTypes        TravelType[] @default([INTERNATIONAL, CLIENT_SITE, OCCASIONAL])
+  preferredTravelDestinations String[]     @default(["USA", "Europe", "Middle East", "Singapore"])
+  enabledProviders            String[]     @default(["remotive", "arbeitnow", "greenhouse", "adzuna"])
+  updatedAt                   DateTime     @updatedAt
+}

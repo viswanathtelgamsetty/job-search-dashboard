@@ -1,0 +1,122 @@
+import type { DiscoveredJobRaw, JobProvider, SearchCriteria } from "./types";
+import { extractTravelDetails } from "@/lib/travelExtractor";
+
+interface GreenhouseJob {
+  id: number;
+  title: string;
+  absolute_url: string;
+  location: { name: string };
+  updated_at: string;
+  metadata?: Array<{ name: string; value: string }>;
+}
+
+interface GreenhouseBoardResponse {
+  jobs: GreenhouseJob[];
+}
+
+export class GreenhouseCareerProvider implements JobProvider {
+  readonly id = "greenhouse";
+  readonly name = "Company Career Boards (Greenhouse)";
+  readonly isConfigured = true;
+
+  // Board tokens of companies relevant to digital experience, headless CMS, and technical consulting
+  private readonly defaultBoards = [
+    { token: "contentful", name: "Contentful", industry: "Headless CMS Platform" },
+    { token: "slalom", name: "Slalom Build", industry: "Modern Tech Consulting" },
+    { token: "automattic", name: "Automattic", industry: "Digital Publishing & Experience" },
+  ];
+
+  async searchJobs(_criteria: SearchCriteria): Promise<DiscoveredJobRaw[]> {
+    void _criteria;
+    const results: DiscoveredJobRaw[] = [];
+
+    const envTokens = process.env.GREENHOUSE_BOARD_TOKENS
+      ? process.env.GREENHOUSE_BOARD_TOKENS.split(",").map((t) => ({
+          token: t.trim(),
+          name: t.trim().charAt(0).toUpperCase() + t.trim().slice(1),
+          industry: "Technology",
+        }))
+      : this.defaultBoards;
+
+    for (const board of envTokens) {
+      try {
+        const response = await fetch(
+          `https://boards-api.greenhouse.io/v1/boards/${board.token}/jobs`,
+          {
+            headers: { Accept: "application/json" },
+            next: { revalidate: 3600 },
+          }
+        );
+
+        if (!response.ok) {
+          continue;
+        }
+
+        const data: GreenhouseBoardResponse = await response.json();
+        if (!data || !Array.isArray(data.jobs)) {
+          continue;
+        }
+
+        const targetKeywords = [
+          "architect",
+          "lead",
+          "principal",
+          "solutions",
+          "frontend",
+          "consultant",
+          "experience",
+          "react",
+          "partner",
+        ];
+
+        const matched = data.jobs.filter((j) => {
+          const t = j.title.toLowerCase();
+          return targetKeywords.some((kw) => t.includes(kw));
+        });
+
+        for (const job of matched.slice(0, 10)) {
+          const locationName = job.location?.name || "Global / Remote";
+          const isRemote =
+            /remote/i.test(locationName) || /anywhere/i.test(locationName);
+          const travel = extractTravelDetails(`${job.title} ${locationName} ${board.name}`);
+
+          let roleFamily = "Senior Technical Lead";
+          if (/architect/i.test(job.title)) {
+            roleFamily = "Solutions Architect";
+          } else if (/consultant|partner/i.test(job.title)) {
+            roleFamily = "Technical Consultant";
+          }
+
+          results.push({
+            externalId: `gh-${board.token}-${job.id}`,
+            title: job.title,
+            company: board.name,
+            location: locationName,
+            remoteType: isRemote ? "REMOTE" : "HYBRID",
+            skills: [
+              "React",
+              "TypeScript",
+              board.name.includes("Contentful") ? "Contentful" : "Architecture",
+              "Headless CMS",
+            ],
+            roleFamily,
+            travelType: travel.type,
+            travelPercentage: travel.percentage,
+            travelDestinations: travel.destinations,
+            travelNotes: travel.notes,
+            description: `${job.title} opportunity directly discovered on official ${board.name} Careers board.`,
+            source: `${board.name} Careers`,
+            url: job.absolute_url,
+            postedAt: job.updated_at,
+            discoveredAt: new Date().toISOString(),
+            isDemo: false,
+          });
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch Greenhouse board for ${board.token}:`, err);
+      }
+    }
+
+    return results;
+  }
+}
