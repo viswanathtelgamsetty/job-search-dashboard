@@ -1,5 +1,6 @@
 import type { DiscoveredJobRaw, JobProvider, SearchCriteria } from "./types";
 import { extractTravelDetails } from "@/lib/travelExtractor";
+import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 
 interface JobicyItem {
   id: number;
@@ -103,6 +104,10 @@ export class JobicyJobProvider implements JobProvider {
           ? parseInt(item.annualSalaryMax, 10)
           : undefined;
 
+        const desc = item.jobExcerpt || item.jobDescription?.replace(/<[^>]*>/g, " ") || "";
+        const fullText = `${item.jobTitle} ${location} ${desc}`;
+        const actualSkills = extractActualJobTechnologies([], fullText);
+
         return {
           externalId: `jobicy-${item.id}`,
           title: item.jobTitle,
@@ -112,18 +117,22 @@ export class JobicyJobProvider implements JobProvider {
           salaryMin,
           salaryMax,
           currency: item.salaryCurrency || "USD",
-          skills: ["React", "TypeScript", "Frontend Architecture"],
+          skills: actualSkills,
           roleFamily,
           travelType: travel.type,
           travelPercentage: travel.percentage,
           travelDestinations: travel.destinations,
           travelNotes: travel.notes,
-          description: item.jobExcerpt || item.jobDescription?.slice(0, 500),
+          description: desc,
           source: "Jobicy",
           url: item.url,
           postedAt: item.pubDate,
           discoveredAt: new Date().toISOString(),
           isDemo: false,
+          sourceTitle: item.jobTitle,
+          sourceLocation: location,
+          sourceDescription: desc,
+          sourceSkills: actualSkills,
         };
       });
     } catch (err) {

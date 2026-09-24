@@ -19,7 +19,7 @@ import { classifyLocation, checkIndiaEligibility } from "@/lib/locationClassifie
 import { evaluateJobMatch } from "@/lib/matchingEngine";
 import { classifyRoleFamily } from "@/lib/roleClassifier";
 import { detectSeniority } from "@/lib/seniorityDetector";
-import { extractAndNormalizeTechnologies } from "@/lib/technologyNormalizer";
+import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 import { calculateJobFreshness, detectDataQualityWarnings } from "@/lib/jobQuality";
 import { deduplicateJobs, normalizeCompanyName, normalizeJobTitle } from "@/lib/deduplication";
 import { defaultSearchProfile } from "@/config/defaultProfile";
@@ -113,7 +113,7 @@ export class JobIngestionService {
           const indiaEligibility = checkIndiaEligibility(raw.location, raw.remoteType, raw.description);
           const roleClassification = classifyRoleFamily(raw.title, raw.description);
           const seniorityResult = detectSeniority(raw.title, raw.description, raw.experienceMin, raw.experienceMax);
-          const normalizedSkills = extractAndNormalizeTechnologies(
+          const actualTechnologies = extractActualJobTechnologies(
             raw.skills,
             `${raw.title} ${raw.description || ""}`
           );
@@ -125,7 +125,7 @@ export class JobIngestionService {
               company: raw.company,
               location: raw.location,
               remoteType: raw.remoteType,
-              skills: normalizedSkills,
+              skills: actualTechnologies,
               roleFamily: roleClassification.primary,
               seniority: seniorityResult.level,
               experienceMin: seniorityResult.experienceMin,
@@ -151,6 +151,12 @@ export class JobIngestionService {
             postedAt: raw.postedAt,
             source: raw.source,
           });
+
+          const matchedTargets = match.breakdown.technologyMatch.details
+            ? match.breakdown.technologyMatch.details
+                .filter((d) => d.matched)
+                .map((d) => d.technology)
+            : [];
 
           const job: Job = {
             id: raw.externalId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -179,14 +185,24 @@ export class JobIngestionService {
             conversionDate: parsedSalary.conversionDate,
             isSalaryEstimated: parsedSalary.isEstimated,
 
-            // Seniority & Skills
+            // Seniority & Skills (Evidence-based separation)
             seniority: seniorityResult.level,
             seniorityEvidence: seniorityResult.evidence,
             experienceMin: seniorityResult.experienceMin || 10,
             experienceMax: seniorityResult.experienceMax || 16,
-            skills: normalizedSkills,
+            skills: actualTechnologies,
+            actualJobTechnologies: actualTechnologies,
+            matchedTargetTechnologies: matchedTargets,
+            technologyMatchDetails: match.breakdown.technologyMatch.details || [],
             roleFamily: roleClassification.primary,
             secondaryRoleFamilies: roleClassification.secondary,
+
+            // Raw source auditing (Requirement 7)
+            sourceTitle: raw.sourceTitle || raw.title,
+            sourceLocation: raw.sourceLocation || raw.location,
+            sourceDescription: raw.sourceDescription || raw.description,
+            sourceSkills: raw.sourceSkills || raw.skills,
+            sourceSalary: raw.sourceSalary || raw.salaryText,
 
             travel,
             description: raw.description,

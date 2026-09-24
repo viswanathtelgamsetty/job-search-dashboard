@@ -6,11 +6,12 @@ import type {
   RoleFamily,
   SearchProfile,
   SeniorityLevel,
+  TechnologyMatchDetail,
   TravelType,
 } from "@/types";
 import { matchesSalaryRequirement } from "./salaryParser.ts";
 import { classifyLocation, checkIndiaEligibility } from "./locationClassifier.ts";
-import { extractAndNormalizeTechnologies } from "./technologyNormalizer.ts";
+import { matchTargetTechnologies } from "./technologyMatcher.ts";
 import { classifyRoleFamily, formatRoleFamily } from "./roleClassifier.ts";
 import { detectSeniority } from "./seniorityDetector.ts";
 
@@ -19,7 +20,7 @@ export interface JobForEvaluation {
   company: string;
   location: string;
   remoteType: RemoteType;
-  skills: string[];
+  skills: string[]; // actual technologies from source
   roleFamily?: RoleFamily;
   seniority?: SeniorityLevel;
   experienceMin?: number;
@@ -34,38 +35,28 @@ export interface JobForEvaluation {
 }
 
 /**
- * Deterministic, Transparent Relevance Engine
+ * Deterministic, Evidence-Based Relevance Engine
  *
- * Explicit Bucket Classification Rules:
- *
- * 1. HIGH_RELEVANCE:
- *    - Seniority is ARCHITECT, LEAD, STAFF, PRINCIPAL, DIRECTOR (or 10+ yrs exp requested).
- *    - Role family is in Target Architecture / Tech Lead / Consulting families.
- *    - At least one major target technology / domain matched (React, Next.js, Angular, Contentful, Headless CMS, Commerce, TypeScript, Frontend Architecture).
- *    - Location is India-compatible (Hyderabad, Remote India, Bangalore, Pune, Chennai, Mumbai, Delhi NCR, or Worldwide remote allowing India).
- *    - Not restricted away from India.
- *
- * 2. RELEVANT:
- *    - Role or Seniority aligns with Lead/Architect/Consultant profile.
- *    - Relevant tech stack or domain match.
- *    - India eligible or remote friendly.
- *
- * 3. POSSIBLE:
- *    - Adjacent engineering/consulting role (e.g. Senior Frontend Engineer, general solutions/consulting).
- *    - May require relocation or location confirmation.
- *
- * 4. LOW_RELEVANCE:
- *    - Junior / Entry level, non-tech, purely non-India onsite, or zero matching role/tech criteria.
+ * Strict Rules:
+ * 1. NEVER invent technologies or infer technologies from job seniority/roleFamily.
+ * 2. Every matched technology MUST have verifiable evidence in the title, description, or source tags.
+ * 3. Match reasons MUST be traceable to actual job text.
+ * 4. High Relevance requires:
+ *    - Appropriate Seniority (Architect / Lead / Principal / Staff / Director)
+ *    - Target Architecture / Solutions / Lead / Consulting role family
+ *    - Verifiable presence of at least one target technology (React, Next.js, Angular, TypeScript, Contentful, Headless CMS, Commerce, Digital Experience)
+ *    - India-eligible location (Hyderabad, Remote India, Bangalore, Pune, etc.)
  */
 export function evaluateJobMatch(
   job: JobForEvaluation,
   profile: SearchProfile
 ): JobMatchDetails {
-  const fullText = `${job.title} ${job.company} ${job.location} ${job.skills.join(" ")} ${job.roleFamily || ""} ${job.description || ""}`.toLowerCase();
+  const fullText = `${job.title} ${job.company} ${job.location} ${job.description || ""}`;
+  const fullTextLower = fullText.toLowerCase();
 
   // 1. Role Family Classification & Match
   const roleClassification = job.roleFamily
-    ? { primary: job.roleFamily, secondary: [], evidence: [`Specified: ${job.roleFamily}`] }
+    ? { primary: job.roleFamily, secondary: [], evidence: [`Title: "${job.title}"`] }
     : classifyRoleFamily(job.title, job.description);
 
   const targetFamilies: RoleFamily[] = [
@@ -95,46 +86,52 @@ export function evaluateJobMatch(
 
   const roleMatch: MatchCriterion = {
     matched: isTargetFamily,
-    evidence: roleClassification.evidence,
+    evidence: [`Job title: "${job.title}"`],
     reason: isTargetFamily
-      ? `Role family (${roleClassification.primary}) matches target architectural/leadership profile`
-      : `Role family (${roleClassification.primary}) is outside target leadership families`,
+      ? `Role family (${formatRoleFamily(roleClassification.primary)}) matches target architecture/leadership profile`
+      : `Role family (${formatRoleFamily(roleClassification.primary)}) is outside target leadership families`,
   };
 
-  // 2. Technology & Skills Match
-  const normalizedTechs = extractAndNormalizeTechnologies(job.skills, fullText);
-  const targetTechKeywords = [
+  // 2. Evidence-Based Technology & Skills Match (Strictly Separate from Profile)
+  const targetTechnologies = [
     "React",
     "Next.js",
     "Angular",
     "TypeScript",
     "Contentful",
     "Headless CMS",
+    "Commerce",
     "Digital Experience",
     "Frontend Architecture",
-    "Commerce",
     "Node.js",
+    "GraphQL",
     "Design Systems",
     "REST APIs",
-    "GraphQL",
   ];
 
-  const matchedTargetTechs = normalizedTechs.filter((tech) =>
-    targetTechKeywords.includes(tech)
+  // Match target technologies against actual job content (job.skills + fullText)
+  const techMatchResult = matchTargetTechnologies(
+    targetTechnologies,
+    fullText,
+    job.skills || []
   );
 
-  const technologyMatch: MatchCriterion = {
-    matched: matchedTargetTechs.length > 0,
-    evidence: matchedTargetTechs,
+  const matchedTechs = techMatchResult.matched;
+  const matchedTechNames = matchedTechs.map((m) => m.technology);
+
+  const technologyMatch: MatchCriterion & { details?: TechnologyMatchDetail[] } = {
+    matched: matchedTechs.length > 0,
+    evidence: matchedTechs.map((m) => `${m.technology}: "${m.evidence}"`),
     reason:
-      matchedTargetTechs.length > 0
-        ? `Matches ${matchedTargetTechs.length} core profile technologies (${matchedTargetTechs.slice(0, 3).join(", ")})`
-        : "No direct matches with target React/Architecture/CMS/Commerce tech stack",
+      matchedTechs.length > 0
+        ? `Found ${matchedTechs.length} verified target technologies: ${matchedTechNames.join(", ")}`
+        : "None of target technologies (React, Next.js, Angular, Contentful, CMS) found in job content",
+    details: [...techMatchResult.matched, ...techMatchResult.unmatched],
   };
 
   // 3. Seniority & Experience Match
   const seniorityResult = job.seniority
-    ? { level: job.seniority, evidence: `Seniority specified: ${job.seniority}`, experienceMin: job.experienceMin, experienceMax: job.experienceMax }
+    ? { level: job.seniority, evidence: `Title/experience indicates ${job.seniority}`, experienceMin: job.experienceMin, experienceMax: job.experienceMax }
     : detectSeniority(job.title, job.description, job.experienceMin, job.experienceMax);
 
   const isSeniorLevel = [
@@ -152,7 +149,7 @@ export function evaluateJobMatch(
 
   const seniorityMatch: MatchCriterion = {
     matched: isSeniorLevel || seniorityResult.level === "SENIOR",
-    evidence: [seniorityResult.level, seniorityResult.evidence],
+    evidence: [seniorityResult.evidence],
     reason: isSeniorLevel
       ? `Seniority (${seniorityResult.level}) matches 12+ years Architect/Lead expectation`
       : `Seniority level is ${seniorityResult.level}`,
@@ -160,7 +157,7 @@ export function evaluateJobMatch(
 
   const experienceMatch: MatchCriterion = {
     matched: expMatchesYears,
-    evidence: seniorityResult.experienceMin ? [`${seniorityResult.experienceMin}+ years requested`] : ["Seniority implied from role"],
+    evidence: seniorityResult.experienceMin ? [`${seniorityResult.experienceMin}+ years requested`] : [seniorityResult.evidence],
     reason: expMatchesYears
       ? `Experience requirement aligns with ${profile.experienceYears}+ years profile`
       : `Experience requirement (${seniorityResult.experienceMin}+ yrs) exceeds target profile`,
@@ -176,7 +173,7 @@ export function evaluateJobMatch(
 
   const locationMatch: MatchCriterion = {
     matched: isLocationCompatible,
-    evidence: [normLoc, job.location],
+    evidence: [`Location: "${job.location}"`],
     reason: normLoc === "HYDERABAD"
       ? "Hyderabad location directly matches primary preferred city"
       : isPreferredCity
@@ -186,7 +183,7 @@ export function evaluateJobMatch(
 
   const remoteMatch: MatchCriterion = {
     matched: job.remoteType === "REMOTE" || isIndiaRemote || normLoc === "REMOTE_GLOBAL",
-    evidence: [job.remoteType || "ONSITE", normLoc],
+    evidence: [`Remote Type: ${job.remoteType || "ONSITE"}`, `Location: ${normLoc}`],
     reason: isIndiaRemote
       ? "Remote from India permitted"
       : normLoc === "REMOTE_GLOBAL" && indiaCheck.isIndiaEligible
@@ -228,8 +225,8 @@ export function evaluateJobMatch(
   };
 
   // 7. Client-Facing / Consulting Match
-  const clientFacingKeywords = /\b(client|customer|stakeholder|consulting|professional services|solutions|presales|vendor|partner)\b/i;
-  const isClientFacing = clientFacingKeywords.test(fullText) || [
+  const clientFacingKeywords = /\b(?:client|customer|stakeholder|consulting|professional services|solutions|presales|vendor|partner)\b/i;
+  const isClientFacing = clientFacingKeywords.test(fullTextLower) || [
     "SOLUTIONS_ARCHITECT",
     "TECHNICAL_CONSULTANT",
     "IMPLEMENTATION_CONSULTANT",
@@ -239,35 +236,41 @@ export function evaluateJobMatch(
 
   const clientFacingMatch: MatchCriterion = {
     matched: isClientFacing,
-    evidence: isClientFacing ? ["Client-facing / consulting elements detected"] : [],
+    evidence: isClientFacing ? ["Client-facing / consulting elements detected in title or description"] : [],
     reason: isClientFacing
       ? "Involves client-facing, advisory, or enterprise stakeholder interaction"
       : "Internal engineering focus",
   };
 
-  // Determine Concrete Reasons ("Why this matches")
+  // Traceable Match Reasons (Only include what has real evidence!)
   const reasons: string[] = [];
   if (roleMatch.matched) {
-    reasons.push(`✓ ${formatRoleFamily(roleClassification.primary)}`);
+    reasons.push(`✓ ${formatRoleFamily(roleClassification.primary)} (Evidence: "${job.title}")`);
   }
   if (seniorityMatch.matched && seniorityResult.level !== "UNKNOWN") {
-    reasons.push(`✓ ${seniorityResult.level} seniority level requested`);
+    reasons.push(`✓ ${seniorityResult.level} seniority (Evidence: ${seniorityResult.evidence})`);
   }
-  if (matchedTargetTechs.length > 0) {
-    reasons.push(`✓ ${matchedTargetTechs.slice(0, 3).join(" / ")}`);
+
+  // ONLY add technology match reasons if ACTUALLY matched with evidence!
+  if (matchedTechs.length > 0) {
+    matchedTechs.slice(0, 3).forEach((m) => {
+      reasons.push(`✓ ${m.technology} (Evidence: "${m.evidence}")`);
+    });
   }
+
   if (normLoc === "HYDERABAD") {
-    reasons.push("✓ Hyderabad (Primary Target City)");
+    reasons.push(`✓ Hyderabad location (Evidence: "${job.location}")`);
   } else if (indiaCheck.isIndiaEligible) {
-    reasons.push("✓ India eligible");
+    reasons.push(`✓ India eligible (Evidence: "${job.location}")`);
   }
+
   if (tType === "INTERNATIONAL_TRAVEL" && job.travelEvidence) {
-    reasons.push(`✓ International travel: ${job.travelEvidence}`);
+    reasons.push(`✓ International travel: "${job.travelEvidence}"`);
   } else if (tType === "INTERNATIONAL_TRAVEL") {
     reasons.push(`✓ International travel${job.travelPercentage ? ` up to ${job.travelPercentage}%` : ""}`);
   }
 
-  // Determine Cautions ("Why it may NOT match")
+  // Cautions ("Why it may NOT match")
   const cautions: string[] = [];
   if (!indiaCheck.isIndiaEligible) {
     cautions.push(`! Location (${job.location}) does not confirm India hiring eligibility`);
@@ -281,17 +284,18 @@ export function evaluateJobMatch(
   if (seniorityResult.level === "ENTRY" || seniorityResult.level === "MID") {
     cautions.push(`! Listed as ${seniorityResult.level}-level opportunity`);
   }
-  if (!technologyMatch.matched && isTargetFamily) {
-    cautions.push("! Tech stack does not explicitly list React / Next.js / CMS");
+  if (matchedTechs.length === 0) {
+    cautions.push("! Target technologies (React, Next.js, Angular, Contentful) not found in posting");
   }
 
-  // Classification into Deterministic Relevance Buckets
+  // Deterministic Relevance Buckets
   let relevanceBucket: RelevanceBucket;
 
   const hasHighSeniority = isSeniorLevel || (seniorityResult.experienceMin && seniorityResult.experienceMin >= 10);
-  const hasTargetTech = matchedTargetTechs.length > 0;
+  const hasTargetTech = matchedTechs.length > 0;
   const isIndiaFriendly = indiaCheck.isIndiaEligible;
 
+  // Strict: HIGH_RELEVANCE requires ALL 4: Seniority + Role + TARGET TECH + India
   if (
     hasHighSeniority &&
     isArchitectOrLead &&
@@ -300,9 +304,9 @@ export function evaluateJobMatch(
   ) {
     relevanceBucket = "HIGH_RELEVANCE";
   } else if (
-    (hasHighSeniority || isTargetFamily) &&
-    (hasTargetTech || isArchitectOrLead) &&
-    isIndiaFriendly
+    (hasHighSeniority || isArchitectOrLead) &&
+    isIndiaFriendly &&
+    (hasTargetTech || isClientFacing)
   ) {
     relevanceBucket = "RELEVANT";
   } else if (
@@ -315,12 +319,12 @@ export function evaluateJobMatch(
     relevanceBucket = "LOW_RELEVANCE";
   }
 
-  // Backward-compatible overallScore calculation for legacy components
-  let legacyScore = 40;
+  // Legacy score for sorting
+  let legacyScore = 30;
   if (relevanceBucket === "HIGH_RELEVANCE") legacyScore = 90;
-  else if (relevanceBucket === "RELEVANT") legacyScore = 75;
-  else if (relevanceBucket === "POSSIBLE") legacyScore = 55;
-  else legacyScore = 25;
+  else if (relevanceBucket === "RELEVANT") legacyScore = 70;
+  else if (relevanceBucket === "POSSIBLE") legacyScore = 50;
+  else legacyScore = 20;
 
   if (normLoc === "HYDERABAD") legacyScore += 5;
   if (tType === "INTERNATIONAL_TRAVEL") legacyScore += 5;

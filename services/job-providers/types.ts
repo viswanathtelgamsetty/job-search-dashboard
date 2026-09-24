@@ -32,6 +32,11 @@ export interface DiscoveredJobRaw {
   postedAt?: string;
   discoveredAt: string;
   isDemo?: boolean;
+  sourceTitle?: string;
+  sourceLocation?: string;
+  sourceDescription?: string;
+  sourceSkills?: string[];
+  sourceSalary?: string;
 }
 
 export interface JobProvider {

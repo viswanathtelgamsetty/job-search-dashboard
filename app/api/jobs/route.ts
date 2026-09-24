@@ -7,7 +7,7 @@ import { defaultSearchProfile } from "@/config/defaultProfile";
 import { classifyLocation, checkIndiaEligibility } from "@/lib/locationClassifier";
 import { classifyRoleFamily } from "@/lib/roleClassifier";
 import { detectSeniority } from "@/lib/seniorityDetector";
-import { extractAndNormalizeTechnologies } from "@/lib/technologyNormalizer";
+import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 import { calculateJobFreshness } from "@/lib/jobQuality";
 import type { Job } from "@/types";
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
     const roleClassification = classifyRoleFamily(title, body.description);
     const seniorityResult = detectSeniority(title, body.description, body.experienceMin, body.experienceMax);
-    const normalizedSkills = extractAndNormalizeTechnologies(body.skills || ["React", "TypeScript"], `${title} ${body.description || ""}`);
+    const actualTechnologies = extractActualJobTechnologies(body.skills || [], `${title} ${body.description || ""}`);
     const indiaCheck = checkIndiaEligibility(location, body.remoteType, body.description);
     const freshness = calculateJobFreshness(undefined, new Date().toISOString());
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         company,
         location,
         remoteType: body.remoteType || "REMOTE",
-        skills: normalizedSkills,
+        skills: actualTechnologies,
         roleFamily: roleClassification.primary,
         seniority: seniorityResult.level,
         experienceMin: seniorityResult.experienceMin,
@@ -80,6 +80,12 @@ export async function POST(request: Request) {
       },
       defaultSearchProfile
     );
+
+    const matchedTargets = match.breakdown.technologyMatch.details
+      ? match.breakdown.technologyMatch.details
+          .filter((d) => d.matched)
+          .map((d) => d.technology)
+      : [];
 
     const newJob: Job = {
       id: `manual-${Date.now()}`,
@@ -108,12 +114,20 @@ export async function POST(request: Request) {
       seniorityEvidence: seniorityResult.evidence,
       experienceMin: seniorityResult.experienceMin || 10,
       experienceMax: seniorityResult.experienceMax || 15,
-      skills: normalizedSkills,
+      skills: actualTechnologies,
+      actualJobTechnologies: actualTechnologies,
+      matchedTargetTechnologies: matchedTargets,
+      technologyMatchDetails: match.breakdown.technologyMatch.details || [],
       roleFamily: roleClassification.primary,
       secondaryRoleFamilies: roleClassification.secondary,
       travel,
       description: body.description || "Manually captured opportunity",
       source: body.source || "Manual Entry",
+      sourceTitle: title,
+      sourceLocation: location,
+      sourceDescription: body.description,
+      sourceSkills: body.skills || [],
+      sourceSalary: body.salaryText,
       url: body.url || "#",
       discoveredAt: new Date().toISOString(),
       lastVerifiedAt: new Date().toISOString(),

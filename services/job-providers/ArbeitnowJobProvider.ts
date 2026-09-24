@@ -1,5 +1,6 @@
 import type { DiscoveredJobRaw, JobProvider, SearchCriteria } from "./types";
 import { extractTravelDetails } from "@/lib/travelExtractor";
+import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 
 interface ArbeitnowItem {
   slug: string;
@@ -66,19 +67,21 @@ export class ArbeitnowJobProvider implements JobProvider {
       });
 
       return filtered.slice(0, 15).map((item) => {
-        const travel = extractTravelDetails(
-          `${item.title} ${item.location} ${item.description || ""}`
-        );
+        const cleanDesc = item.description?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() || "";
+        const location = item.location || (item.remote ? "Remote (EU / Global)" : "Europe / Remote");
+        const fullText = `${item.title} ${location} ${cleanDesc}`;
+        const travel = extractTravelDetails(fullText);
+        const actualSkills = extractActualJobTechnologies(item.tags || [], fullText);
 
         return {
           externalId: `arbeitnow-${item.slug}`,
           title: item.title,
           company: item.company_name,
-          location: item.location || (item.remote ? "Remote (EU / Global)" : "Europe / Remote"),
+          location,
           remoteType: item.remote ? "REMOTE" : "HYBRID",
           salaryText: undefined,
           currency: "EUR",
-          skills: item.tags || ["TypeScript", "Frontend"],
+          skills: actualSkills,
           roleFamily: item.title.includes("Architect")
             ? "Frontend Architect"
             : item.title.includes("Lead")
@@ -88,12 +91,16 @@ export class ArbeitnowJobProvider implements JobProvider {
           travelPercentage: travel.percentage,
           travelDestinations: travel.destinations,
           travelNotes: travel.notes,
-          description: item.description?.replace(/<[^>]*>/g, "").slice(0, 500),
+          description: cleanDesc,
           source: "Arbeitnow",
           url: item.url,
           postedAt: new Date(item.created_at * 1000).toISOString(),
           discoveredAt: new Date().toISOString(),
           isDemo: false,
+          sourceTitle: item.title,
+          sourceLocation: location,
+          sourceDescription: cleanDesc,
+          sourceSkills: actualSkills,
         };
       });
     } catch (err) {

@@ -1,5 +1,6 @@
 import type { DiscoveredJobRaw, JobProvider, SearchCriteria } from "./types";
 import { extractTravelDetails } from "@/lib/travelExtractor";
+import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 
 interface AdzunaJobItem {
   id: string;
@@ -57,29 +58,38 @@ export class AdzunaJobProvider implements JobProvider {
       }
 
       return data.results.map((item) => {
-        const travel = extractTravelDetails(`${item.title} ${item.description || ""}`);
+        const cleanTitle = item.title.replace(/<\/?[^>]+(>|$)/g, "");
+        const cleanDesc = item.description?.replace(/<\/?[^>]+(>|$)/g, " ").replace(/\s+/g, " ").trim() || "";
+        const location = item.location?.display_name || "India";
+        const fullText = `${cleanTitle} ${location} ${cleanDesc}`;
+        const travel = extractTravelDetails(fullText);
+        const actualSkills = extractActualJobTechnologies([], fullText);
 
         return {
           externalId: `adzuna-${item.id}`,
-          title: item.title.replace(/<\/?[^>]+(>|$)/g, ""),
+          title: cleanTitle,
           company: item.company?.display_name || "Enterprise Employer",
-          location: item.location?.display_name || "India",
+          location,
           remoteType: /remote/i.test(item.description) ? "REMOTE" : "HYBRID",
           salaryMin: item.salary_min,
           salaryMax: item.salary_max,
           currency: country === "in" ? "INR" : "USD",
-          skills: ["React", "TypeScript", "Frontend Architecture"],
+          skills: actualSkills,
           roleFamily: "Senior Technical Lead",
           travelType: travel.type,
           travelPercentage: travel.percentage,
           travelDestinations: travel.destinations,
           travelNotes: travel.notes,
-          description: item.description?.replace(/<\/?[^>]+(>|$)/g, "").slice(0, 500),
+          description: cleanDesc.slice(0, 1500),
           source: "Adzuna",
           url: item.redirect_url,
           postedAt: item.created,
           discoveredAt: new Date().toISOString(),
           isDemo: false,
+          sourceTitle: cleanTitle,
+          sourceLocation: location,
+          sourceDescription: cleanDesc,
+          sourceSkills: actualSkills,
         };
       });
     } catch (err) {

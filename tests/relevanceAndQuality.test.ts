@@ -7,6 +7,7 @@ import { classifyLocation, checkIndiaEligibility } from "../lib/locationClassifi
 import { parseAndNormalizeSalary } from "../lib/salaryParser.ts";
 import { extractTravelDetails } from "../lib/travelExtractor.ts";
 import { evaluateJobMatch } from "../lib/matchingEngine.ts";
+import { extractActualJobTechnologies, matchTargetTechnologies } from "../lib/technologyMatcher.ts";
 import { defaultSearchProfile } from "../config/defaultProfile.ts";
 
 // 1. Role Family Classification Tests
@@ -235,3 +236,133 @@ test("Relevance: Relevant for Tech Lead in Bangalore with React", () => {
 
   assert.ok(match.relevanceBucket === "HIGH_RELEVANCE" || match.relevanceBucket === "RELEVANT");
 });
+
+// 9. Evidence-Based Technology Matching Tests (Phase 3.1)
+test("TEST: Job description = 'React and TypeScript required' -> React & TypeScript matched with evidence", () => {
+  const desc = "Strong experience with React and TypeScript required for this platform role.";
+  const matchResult = matchTargetTechnologies(["React", "TypeScript"], desc, []);
+  
+  const reactMatch = matchResult.matched.find((m) => m.technology === "React");
+  const tsMatch = matchResult.matched.find((m) => m.technology === "TypeScript");
+
+  assert.ok(reactMatch, "React should be in matched list");
+  assert.strictEqual(reactMatch?.matched, true);
+  assert.ok(reactMatch?.evidence && reactMatch.evidence.includes("React"));
+
+  assert.ok(tsMatch, "TypeScript should be in matched list");
+  assert.strictEqual(tsMatch?.matched, true);
+  assert.ok(tsMatch?.evidence && tsMatch.evidence.includes("TypeScript"));
+});
+
+test("TEST: Job description = 'Java and AWS required' -> React & TypeScript NOT matched", () => {
+  const desc = "Java and AWS required for cloud microservices development.";
+  const matchResult = matchTargetTechnologies(["React", "TypeScript"], desc, ["Java", "AWS"]);
+
+  const reactMatch = matchResult.unmatched.find((m) => m.technology === "React");
+  const tsMatch = matchResult.unmatched.find((m) => m.technology === "TypeScript");
+
+  assert.ok(reactMatch, "React should be in unmatched list");
+  assert.strictEqual(reactMatch?.matched, false);
+  assert.strictEqual(reactMatch?.evidence, null);
+
+  assert.ok(tsMatch, "TypeScript should be in unmatched list");
+  assert.strictEqual(tsMatch?.matched, false);
+  assert.strictEqual(tsMatch?.evidence, null);
+});
+
+test("TEST: Job title = 'Solutions Architect' -> roleFamily = SOLUTIONS_ARCHITECT & React NOT automatically matched", () => {
+  const roleFamilyRes = classifyRoleFamily("Solutions Architect");
+  assert.strictEqual(roleFamilyRes.primary, "SOLUTIONS_ARCHITECT");
+
+  const match = evaluateJobMatch(
+    {
+      title: "Solutions Architect",
+      company: "Cloud Systems Inc",
+      location: "Hyderabad, India",
+      remoteType: "HYBRID",
+      skills: ["Java", "AWS", "Kubernetes"],
+      roleFamily: "SOLUTIONS_ARCHITECT",
+      seniority: "ARCHITECT",
+      experienceMin: 12,
+      description: "Design cloud enterprise systems using Java, AWS, and Kubernetes.",
+    },
+    defaultSearchProfile
+  );
+
+  // React must NOT be automatically matched
+  const reactDetail = match.breakdown.technologyMatch.details?.find((d) => d.technology === "React");
+  assert.strictEqual(reactDetail?.matched, false);
+  assert.strictEqual(reactDetail?.evidence, null);
+  assert.ok(!match.reasons.some((r) => r.includes("React")));
+  // Should NOT be HIGH_RELEVANCE because target tech stack is missing
+  assert.notStrictEqual(match.relevanceBucket, "HIGH_RELEVANCE");
+});
+
+test("TEST: Job title = 'React Architect' -> React matched", () => {
+  const title = "React Architect";
+  const matchResult = matchTargetTechnologies(["React"], title, []);
+  const reactMatch = matchResult.matched.find((m) => m.technology === "React");
+
+  assert.ok(reactMatch, "React should be in matched list");
+  assert.strictEqual(reactMatch?.matched, true);
+  assert.ok(reactMatch?.evidence?.includes("React"));
+});
+
+test("TEST: Job description = 'Experience working with React' -> React matched", () => {
+  const desc = "Experience working with React and modern UI libraries is essential.";
+  const matchResult = matchTargetTechnologies(["React"], desc, []);
+  const reactMatch = matchResult.matched.find((m) => m.technology === "React");
+
+  assert.ok(reactMatch, "React should be in matched list");
+  assert.strictEqual(reactMatch?.matched, true);
+  assert.ok(reactMatch?.evidence && reactMatch.evidence.includes("React"));
+});
+
+test("TEST: Never invent generic technologies (Architecture, Enterprise Solutions)", () => {
+  const rawSkills = ["Architecture", "Enterprise Solutions", "Java", "Kubernetes"];
+  const actualTechs = extractActualJobTechnologies(rawSkills, "Backend engineer with Java and Kubernetes");
+
+  assert.ok(actualTechs.includes("Java"));
+  assert.ok(actualTechs.includes("Kubernetes"));
+  assert.ok(!actualTechs.includes("Architecture"), "Architecture should NOT be treated as a technology");
+  assert.ok(!actualTechs.includes("Enterprise Solutions"), "Enterprise Solutions should NOT be treated as a technology");
+});
+
+test("TEST: High relevance strictly requires target technology match, seniority, role family, and India", () => {
+  // A Solutions Architect in Hyderabad requiring AWS & Java without React/CMS is RELEVANT or POSSIBLE, not HIGH_RELEVANCE
+  const matchNoTech = evaluateJobMatch(
+    {
+      title: "Solutions Architect",
+      company: "Enterprise Cloud",
+      location: "Hyderabad, India",
+      remoteType: "HYBRID",
+      skills: ["Java", "AWS"],
+      roleFamily: "SOLUTIONS_ARCHITECT",
+      seniority: "ARCHITECT",
+      experienceMin: 12,
+      description: "Enterprise Java and AWS architecture.",
+    },
+    defaultSearchProfile
+  );
+  assert.notStrictEqual(matchNoTech.relevanceBucket, "HIGH_RELEVANCE");
+
+  // An Architect in Hyderabad WITH Contentful, Next.js, and TypeScript IS HIGH_RELEVANCE
+  const matchWithTech = evaluateJobMatch(
+    {
+      title: "Digital Experience Architect",
+      company: "Modern Web Co",
+      location: "Hyderabad, India",
+      remoteType: "HYBRID",
+      skills: ["Contentful", "Next.js", "TypeScript"],
+      roleFamily: "CMS_DIGITAL_EXPERIENCE",
+      seniority: "ARCHITECT",
+      experienceMin: 12,
+      description: "Architecting headless experience platforms with Contentful, Next.js, and TypeScript.",
+    },
+    defaultSearchProfile
+  );
+  assert.strictEqual(matchWithTech.relevanceBucket, "HIGH_RELEVANCE");
+  assert.ok(matchWithTech.reasons.some((r) => r.includes("Contentful")));
+  assert.ok(matchWithTech.reasons.some((r) => r.includes("Next.js")));
+});
+

@@ -1,5 +1,6 @@
 import type { DiscoveredJobRaw, JobProvider, SearchCriteria } from "./types";
 import { extractTravelDetails } from "@/lib/travelExtractor";
+import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 
 interface RemotiveJobItem {
   id: number;
@@ -68,18 +69,19 @@ export class RemotiveJobProvider implements JobProvider {
       });
 
       return matchedJobs.slice(0, 20).map((item) => {
-        const travel = extractTravelDetails(
-          `${item.title} ${item.candidate_required_location} ${item.description || ""}`
-        );
-
-        // Normalize skills
-        const skills = item.tags && item.tags.length > 0 ? item.tags : ["React", "TypeScript"];
+        const cleanDesc = item.description?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() || "";
+        const location = item.candidate_required_location || "Worldwide Remote / India eligible";
+        const fullText = `${item.title} ${location} ${cleanDesc}`;
+        const travel = extractTravelDetails(fullText);
+        const actualSkills = extractActualJobTechnologies(item.tags || [], fullText);
 
         let roleFamily = "Senior Technical Lead";
-        if (/architect/i.test(item.title)) {
+        if (/frontend\s+architect|ui\s+architect/i.test(item.title)) {
           roleFamily = "Frontend Architect";
-        } else if (/solutions/i.test(item.title)) {
+        } else if (/solutions?\s+architect/i.test(item.title)) {
           roleFamily = "Solutions Architect";
+        } else if (/technical\s+architect/i.test(item.title)) {
+          roleFamily = "Technical Architect";
         } else if (/consultant/i.test(item.title)) {
           roleFamily = "Technical Consultant";
         }
@@ -88,21 +90,25 @@ export class RemotiveJobProvider implements JobProvider {
           externalId: `remotive-${item.id}`,
           title: item.title,
           company: item.company_name,
-          location: item.candidate_required_location || "Worldwide Remote / India eligible",
+          location,
           remoteType: "REMOTE",
           salaryText: item.salary || undefined,
-          skills,
+          skills: actualSkills,
           roleFamily,
           travelType: travel.type,
           travelPercentage: travel.percentage,
           travelDestinations: travel.destinations,
           travelNotes: travel.notes,
-          description: item.description?.replace(/<[^>]*>/g, "").slice(0, 500),
+          description: cleanDesc,
           source: "Remotive",
           url: item.url,
           postedAt: item.publication_date,
           discoveredAt: new Date().toISOString(),
           isDemo: false,
+          sourceTitle: item.title,
+          sourceLocation: location,
+          sourceDescription: cleanDesc,
+          sourceSkills: actualSkills,
         };
       });
     } catch (err) {

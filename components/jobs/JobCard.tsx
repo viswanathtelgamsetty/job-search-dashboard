@@ -242,16 +242,23 @@ export function JobCard({
             </div>
           )}
 
-          {/* Normalized Skills Tags */}
+          {/* Extracted Actual Job Technologies */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            {job.skills.map((skill) => (
-              <span
-                key={skill}
-                className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-xs text-slate-300"
-              >
-                {skill}
-              </span>
-            ))}
+            {job.skills.map((skill) => {
+              const isMatched = job.matchedTargetTechnologies?.includes(skill);
+              return (
+                <span
+                  key={skill}
+                  className={`rounded-md border px-2.5 py-1 text-xs ${
+                    isMatched
+                      ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-300 font-medium"
+                      : "border-slate-800 bg-slate-950/80 text-slate-300"
+                  }`}
+                >
+                  {isMatched ? `✓ ${skill}` : skill}
+                </span>
+              );
+            })}
           </div>
 
           {/* Why this matches (Concrete Reasons) */}

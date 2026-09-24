@@ -3,7 +3,18 @@ import { evaluateJobMatch } from "./matchingEngine";
 import { classifyLocation } from "./locationClassifier";
 import { defaultSearchProfile } from "@/config/defaultProfile";
 
-const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedCompany" | "normalizedLocation">> = [
+const rawDemoJobs: Array<
+  Omit<
+    Job,
+    | "match"
+    | "normalizedTitle"
+    | "normalizedCompany"
+    | "normalizedLocation"
+    | "actualJobTechnologies"
+    | "matchedTargetTechnologies"
+    | "technologyMatchDetails"
+  >
+> = [
   {
     id: "demo-job-001",
     title: "Senior Technical Lead - Digital Experience & Headless",
@@ -278,6 +289,15 @@ export const demoSeedJobs: Job[] = rawDemoJobs.map((raw) => {
     normalizedTitle: normTitle,
     normalizedCompany: normComp,
     normalizedLocation,
+    actualJobTechnologies: raw.skills,
+    matchedTargetTechnologies: match.breakdown.technologyMatch.details
+      ?.filter((d) => d.matched)
+      .map((d) => d.technology) || [],
+    technologyMatchDetails: match.breakdown.technologyMatch.details || [],
+    sourceTitle: raw.title,
+    sourceLocation: raw.location,
+    sourceDescription: raw.description,
+    sourceSkills: raw.skills,
     match,
   };
 });

@@ -104,6 +104,12 @@ export type FreshnessStatus =
   | "OLDER"
   | "UNKNOWN";
 
+export interface TechnologyMatchDetail {
+  technology: string;
+  matched: boolean;
+  evidence: string | null;
+}
+
 export interface MatchCriterion {
   matched: boolean;
   evidence: string[];
@@ -117,7 +123,9 @@ export interface JobMatchDetails {
   missingOrNeutral?: string[];
   breakdown: {
     roleMatch: MatchCriterion;
-    technologyMatch: MatchCriterion;
+    technologyMatch: MatchCriterion & {
+      details?: TechnologyMatchDetail[];
+    };
     experienceMatch: MatchCriterion;
     locationMatch: MatchCriterion;
     remoteMatch: MatchCriterion;
@@ -162,12 +170,22 @@ export interface Job {
   experienceMin?: number;
   experienceMax?: number;
 
-  // Skills & Role Families
-  skills: string[];
+  // Skills & Role Families (Strictly separated)
+  skills: string[]; // actualJobTechnologies
+  actualJobTechnologies: string[];
+  matchedTargetTechnologies: string[];
+  technologyMatchDetails: TechnologyMatchDetail[];
   roleFamily: RoleFamily;
   secondaryRoleFamilies?: RoleFamily[];
   travel: TravelDetails;
   description?: string;
+
+  // Raw source auditing (Requirement 7)
+  sourceTitle?: string;
+  sourceLocation?: string;
+  sourceDescription?: string;
+  sourceSkills?: string[];
+  sourceSalary?: string;
 
   // Sourcing & Discovery & Quality
   source: string;
