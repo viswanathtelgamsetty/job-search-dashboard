@@ -193,7 +193,7 @@ export function calculateDashboardStats(jobs: Job[]): DashboardStats {
       internationalTravelCount++;
     }
 
-    if (job.match.overallScore >= 75) {
+    if ((job.match?.overallScore ?? 0) >= 75 || job.match?.relevanceBucket === "HIGH_RELEVANCE") {
       highMatchCount++;
     }
   }

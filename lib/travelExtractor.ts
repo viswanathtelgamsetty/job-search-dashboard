@@ -21,7 +21,7 @@ export function extractTravelDetails(
 
   // 1. Check for Relocation first
   const relocationRegex =
-    /(?:relocation(?:\s+to\s+[^,.]+)?\s+required|relocate\s+to\s+[^,.]+|willing\s+to\s+relocate(?:\s+to\s+[^,.]+)?)/i;
+    /(?:relocation(?:\s+to\s+[^.]+?)?\s+required|relocate\s+to\s+[^.]+|willing\s+to\s+relocate(?:\s+to\s+[^.]+)?)/i;
   const relocationMatch = combined.match(relocationRegex);
   if (relocationMatch) {
     const evidence = extractSentenceOrSnippet(combined, relocationMatch[0]);

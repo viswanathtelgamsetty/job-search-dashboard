@@ -4,7 +4,11 @@ import { evaluateJobMatch } from "@/lib/matchingEngine";
 import { extractTravelDetails } from "@/lib/travelExtractor";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
 import { defaultSearchProfile } from "@/config/defaultProfile";
-import { classifyLocation } from "@/lib/locationClassifier";
+import { classifyLocation, checkIndiaEligibility } from "@/lib/locationClassifier";
+import { classifyRoleFamily } from "@/lib/roleClassifier";
+import { detectSeniority } from "@/lib/seniorityDetector";
+import { extractAndNormalizeTechnologies } from "@/lib/technologyNormalizer";
+import { calculateJobFreshness } from "@/lib/jobQuality";
 import type { Job } from "@/types";
 
 export async function GET(request: Request) {
@@ -49,21 +53,29 @@ export async function POST(request: Request) {
       notes: body.travelNotes,
     });
 
+    const roleClassification = classifyRoleFamily(title, body.description);
+    const seniorityResult = detectSeniority(title, body.description, body.experienceMin, body.experienceMax);
+    const normalizedSkills = extractAndNormalizeTechnologies(body.skills || ["React", "TypeScript"], `${title} ${body.description || ""}`);
+    const indiaCheck = checkIndiaEligibility(location, body.remoteType, body.description);
+    const freshness = calculateJobFreshness(undefined, new Date().toISOString());
+
     const match = evaluateJobMatch(
       {
         title,
         company,
         location,
         remoteType: body.remoteType || "REMOTE",
-        skills: body.skills || ["React", "TypeScript"],
-        roleFamily: body.roleFamily || "Senior Technical Lead",
-        experienceMin: body.experienceMin || 10,
-        experienceMax: body.experienceMax || 15,
+        skills: normalizedSkills,
+        roleFamily: roleClassification.primary,
+        seniority: seniorityResult.level,
+        experienceMin: seniorityResult.experienceMin,
+        experienceMax: seniorityResult.experienceMax,
         salaryLpaMin: parsedSalary.lpaMin,
         salaryDisclosed: parsedSalary.isDisclosed,
         travelType: travel.type,
         travelPercentage: travel.percentage,
         travelDestinations: travel.destinations,
+        travelEvidence: travel.evidence,
         description: body.description,
       },
       defaultSearchProfile
@@ -76,23 +88,37 @@ export async function POST(request: Request) {
       company,
       normalizedCompany: company.toLowerCase().replace(/[^a-z0-9]/g, ""),
       location,
+      rawLocation: location,
       normalizedLocation: classifyLocation(location, body.remoteType),
       remoteType: body.remoteType || "REMOTE",
+      isIndiaEligible: indiaCheck.isIndiaEligible,
+      indiaEligibilityReason: indiaCheck.reason,
+      salaryState: parsedSalary.salaryState,
       salaryMin: parsedSalary.min,
       salaryMax: parsedSalary.max,
       currency: parsedSalary.currency,
       salaryLpaMin: parsedSalary.lpaMin,
       salaryLpaMax: parsedSalary.lpaMax,
       salaryDisclosed: parsedSalary.isDisclosed,
-      experienceMin: body.experienceMin || 10,
-      experienceMax: body.experienceMax || 15,
-      skills: body.skills || ["React", "Next.js", "TypeScript"],
-      roleFamily: body.roleFamily || "Senior Technical Lead",
+      originalSalary: parsedSalary.originalSalary,
+      originalCurrency: parsedSalary.originalCurrency,
+      convertedSalary: parsedSalary.convertedSalary,
+      isSalaryEstimated: parsedSalary.isEstimated,
+      seniority: seniorityResult.level,
+      seniorityEvidence: seniorityResult.evidence,
+      experienceMin: seniorityResult.experienceMin || 10,
+      experienceMax: seniorityResult.experienceMax || 15,
+      skills: normalizedSkills,
+      roleFamily: roleClassification.primary,
+      secondaryRoleFamilies: roleClassification.secondary,
       travel,
       description: body.description || "Manually captured opportunity",
       source: body.source || "Manual Entry",
       url: body.url || "#",
       discoveredAt: new Date().toISOString(),
+      lastVerifiedAt: new Date().toISOString(),
+      freshness: freshness.freshness,
+      postedDaysAgo: freshness.daysAgo,
       status: body.status || "SAVED",
       isDemo: false,
       match,

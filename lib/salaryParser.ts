@@ -1,3 +1,5 @@
+import type { SalaryState } from "@/types";
+
 export interface ParsedSalary {
   min?: number;
   max?: number;
@@ -5,7 +7,13 @@ export interface ParsedSalary {
   lpaMin?: number;
   lpaMax?: number;
   isDisclosed: boolean;
+  salaryState: SalaryState;
   formatted: string;
+  originalSalary?: string;
+  originalCurrency?: string;
+  convertedSalary?: string;
+  conversionDate?: string;
+  isEstimated: boolean;
 }
 
 export function parseAndNormalizeSalary(
@@ -16,43 +24,81 @@ export function parseAndNormalizeSalary(
 ): ParsedSalary {
   let lpaMin: number | undefined;
   let lpaMax: number | undefined;
+  let salaryState: SalaryState = "SALARY_NOT_DISCLOSED";
+  let isEstimated = false;
+  let originalSalary: string | undefined;
+  const originalCurrency = currency;
+  let convertedSalary: string | undefined;
+  let conversionDate: string | undefined;
 
   if (min !== undefined && min > 0) {
     if (currency === "INR") {
       lpaMin = min < 1000 ? min : Math.round(min / 100000);
       lpaMax = max && max > 0 ? (max < 1000 ? max : Math.round(max / 100000)) : lpaMin;
+      salaryState = lpaMax && lpaMax !== lpaMin ? "SALARY_RANGE" : "SALARY_CONFIRMED";
+      originalSalary = lpaMax && lpaMax !== lpaMin ? `₹${lpaMin}L – ₹${lpaMax}L PA` : `₹${lpaMin}L PA`;
     } else if (currency === "USD") {
-      // 1 USD ~ 85 INR, annual $100,000 = 85,00,000 INR = 85 LPA
-      lpaMin = Math.round((min * 85) / 100000);
-      lpaMax = max ? Math.round((max * 85) / 100000) : lpaMin;
+      // USD Disclosed: do not present as confirmed Indian compensation!
+      const uMin = min;
+      const uMax = max || min;
+      originalSalary = uMax !== uMin ? `$${Math.round(uMin / 1000)}k – $${Math.round(uMax / 1000)}k` : `$${Math.round(uMin / 1000)}k`;
+      // Converted estimate for reference
+      isEstimated = true;
+      salaryState = "SALARY_ESTIMATED";
+      const estLpaMin = Math.round((uMin * 85) / 100000);
+      const estLpaMax = Math.round((uMax * 85) / 100000);
+      lpaMin = estLpaMin;
+      lpaMax = estLpaMax;
+      convertedSalary = `~₹${estLpaMin}L – ₹${estLpaMax}L PA (est. @ 85 INR/USD)`;
+      conversionDate = new Date().toISOString().split("T")[0];
     } else if (currency === "EUR") {
-      // 1 EUR ~ 92 INR
-      lpaMin = Math.round((min * 92) / 100000);
-      lpaMax = max ? Math.round((max * 92) / 100000) : lpaMin;
+      const eMin = min;
+      const eMax = max || min;
+      originalSalary = eMax !== eMin ? `€${Math.round(eMin / 1000)}k – €${Math.round(eMax / 1000)}k` : `€${Math.round(eMin / 1000)}k`;
+      isEstimated = true;
+      salaryState = "SALARY_ESTIMATED";
+      const estLpaMin = Math.round((eMin * 92) / 100000);
+      const estLpaMax = Math.round((eMax * 92) / 100000);
+      lpaMin = estLpaMin;
+      lpaMax = estLpaMax;
+      convertedSalary = `~₹${estLpaMin}L – ₹${estLpaMax}L PA (est. @ 92 INR/EUR)`;
+      conversionDate = new Date().toISOString().split("T")[0];
     }
   } else if (salaryText) {
     const clean = salaryText.replace(/,/g, "");
 
-    // Check for Lakhs pattern: "35 - 45 LPA", "35L", "3500000"
-    const lpaMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:lpa|lakh|lakhs|l)/i);
+    // 1. Check for Lakhs pattern: "35 - 45 LPA", "35L", "3500000"
+    const lpaMatch = clean.match(
+      /(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:lpa|lakh|lakhs|l)\b/i
+    );
     if (lpaMatch) {
       lpaMin = parseFloat(lpaMatch[1]);
       lpaMax = parseFloat(lpaMatch[2]);
       min = lpaMin * 100000;
       max = lpaMax * 100000;
+      currency = "INR";
+      salaryState = "SALARY_RANGE";
+      originalSalary = `₹${lpaMin}L – ₹${lpaMax}L PA`;
     } else {
-      const singleLpa = clean.match(/(\d+(?:\.\d+)?)\s*(?:lpa|lakh|lakhs|l)/i);
+      const singleLpa = clean.match(
+        /(\d+(?:\.\d+)?)\s*(?:lpa|lakh|lakhs|l)\b/i
+      );
       if (singleLpa) {
         lpaMin = parseFloat(singleLpa[1]);
         lpaMax = lpaMin;
         min = lpaMin * 100000;
         max = min;
+        currency = "INR";
+        salaryState = "SALARY_CONFIRMED";
+        originalSalary = `₹${lpaMin}L PA`;
       }
     }
 
-    // Check USD pattern: "$130k - $170k" or "$140,000"
+    // 2. Check USD pattern: "$130k - $170k" or "$140,000"
     if (!lpaMin) {
-      const usdMatch = clean.match(/\$(\d+(?:\.\d+)?)\s*k?\s*(?:-|to)\s*\$?(\d+(?:\.\d+)?)\s*k?/i);
+      const usdMatch = clean.match(
+        /\$(\d+(?:\.\d+)?)\s*k?\s*(?:-|to)\s*\$?(\d+(?:\.\d+)?)\s*k?/i
+      );
       if (usdMatch) {
         let uMin = parseFloat(usdMatch[1]);
         let uMax = parseFloat(usdMatch[2]);
@@ -61,24 +107,32 @@ export function parseAndNormalizeSalary(
         currency = "USD";
         min = uMin;
         max = uMax;
+        originalSalary = `$${Math.round(uMin / 1000)}k – $${Math.round(uMax / 1000)}k`;
+        isEstimated = true;
+        salaryState = "SALARY_ESTIMATED";
         lpaMin = Math.round((uMin * 85) / 100000);
         lpaMax = Math.round((uMax * 85) / 100000);
+        convertedSalary = `~₹${lpaMin}L – ₹${lpaMax}L PA (est. @ 85 INR/USD)`;
+        conversionDate = new Date().toISOString().split("T")[0];
       }
     }
   }
 
   const isDisclosed = lpaMin !== undefined && lpaMin > 0;
+  if (!isDisclosed) {
+    salaryState = "SALARY_NOT_DISCLOSED";
+  }
 
   let formatted = "Salary Undisclosed";
   if (isDisclosed) {
-    if (currency === "INR" || (lpaMin && !currency)) {
+    if (salaryState === "SALARY_CONFIRMED" || salaryState === "SALARY_RANGE") {
       if (lpaMax && lpaMax !== lpaMin) {
         formatted = `₹${lpaMin}L – ₹${lpaMax}L PA`;
       } else {
         formatted = `₹${lpaMin}L+ PA`;
       }
-    } else if (currency === "USD") {
-      formatted = `$${Math.round(min! / 1000)}k – $${Math.round(max! / 1000)}k (~₹${lpaMin}L+ PA)`;
+    } else if (salaryState === "SALARY_ESTIMATED") {
+      formatted = `${originalSalary} (${convertedSalary})`;
     } else {
       formatted = `${currency} ${min} – ${max}`;
     }
@@ -91,7 +145,13 @@ export function parseAndNormalizeSalary(
     lpaMin,
     lpaMax,
     isDisclosed,
+    salaryState,
     formatted,
+    originalSalary,
+    originalCurrency,
+    convertedSalary,
+    conversionDate,
+    isEstimated,
   };
 }
 
@@ -101,10 +161,9 @@ export function matchesSalaryRequirement(
   targetLpa = 35
 ): { matches: boolean; reason: string } {
   if (!isDisclosed || lpaMin === undefined || lpaMin === null) {
-    // Rule: "Surface lower salary roles only if salary is not disclosed; never reject a job solely because salary is unknown"
     return {
       matches: true,
-      reason: "Salary Undisclosed (Retained per search policy)",
+      reason: "Salary Undisclosed (Retained per policy — never rejected on unlisted comp)",
     };
   }
 

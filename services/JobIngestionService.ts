@@ -15,8 +15,12 @@ import {
 } from "./job-providers";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
 import { extractTravelDetails } from "@/lib/travelExtractor";
-import { classifyLocation } from "@/lib/locationClassifier";
+import { classifyLocation, checkIndiaEligibility } from "@/lib/locationClassifier";
 import { evaluateJobMatch } from "@/lib/matchingEngine";
+import { classifyRoleFamily } from "@/lib/roleClassifier";
+import { detectSeniority } from "@/lib/seniorityDetector";
+import { extractAndNormalizeTechnologies } from "@/lib/technologyNormalizer";
+import { calculateJobFreshness, detectDataQualityWarnings } from "@/lib/jobQuality";
 import { deduplicateJobs, normalizeCompanyName, normalizeJobTitle } from "@/lib/deduplication";
 import { defaultSearchProfile } from "@/config/defaultProfile";
 
@@ -106,6 +110,14 @@ export class JobIngestionService {
           );
 
           const normalizedLocation = classifyLocation(raw.location, raw.remoteType);
+          const indiaEligibility = checkIndiaEligibility(raw.location, raw.remoteType, raw.description);
+          const roleClassification = classifyRoleFamily(raw.title, raw.description);
+          const seniorityResult = detectSeniority(raw.title, raw.description, raw.experienceMin, raw.experienceMax);
+          const normalizedSkills = extractAndNormalizeTechnologies(
+            raw.skills,
+            `${raw.title} ${raw.description || ""}`
+          );
+          const freshness = calculateJobFreshness(raw.postedAt, raw.discoveredAt);
 
           const match = evaluateJobMatch(
             {
@@ -113,19 +125,32 @@ export class JobIngestionService {
               company: raw.company,
               location: raw.location,
               remoteType: raw.remoteType,
-              skills: raw.skills,
-              roleFamily: raw.roleFamily,
-              experienceMin: raw.experienceMin,
-              experienceMax: raw.experienceMax,
+              skills: normalizedSkills,
+              roleFamily: roleClassification.primary,
+              seniority: seniorityResult.level,
+              experienceMin: seniorityResult.experienceMin,
+              experienceMax: seniorityResult.experienceMax,
               salaryLpaMin: parsedSalary.lpaMin,
               salaryDisclosed: parsedSalary.isDisclosed,
               travelType: travel.type,
               travelPercentage: travel.percentage,
               travelDestinations: travel.destinations,
+              travelEvidence: travel.evidence,
               description: raw.description,
             },
             profile
           );
+
+          const warnings = detectDataQualityWarnings({
+            company: raw.company,
+            location: raw.location,
+            url: raw.url,
+            salaryDisclosed: parsedSalary.isDisclosed,
+            salaryLpaMin: parsedSalary.lpaMin,
+            currency: parsedSalary.currency,
+            postedAt: raw.postedAt,
+            source: raw.source,
+          });
 
           const job: Job = {
             id: raw.externalId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -134,24 +159,45 @@ export class JobIngestionService {
             company: raw.company,
             normalizedCompany: normalizeCompanyName(raw.company),
             location: raw.location,
+            rawLocation: raw.location,
             normalizedLocation,
             remoteType: raw.remoteType,
+            isIndiaEligible: indiaEligibility.isIndiaEligible,
+            indiaEligibilityReason: indiaEligibility.reason,
+
+            // Salary Quality
+            salaryState: parsedSalary.salaryState,
             salaryMin: parsedSalary.min,
             salaryMax: parsedSalary.max,
             currency: parsedSalary.currency,
             salaryLpaMin: parsedSalary.lpaMin,
             salaryLpaMax: parsedSalary.lpaMax,
             salaryDisclosed: parsedSalary.isDisclosed,
-            experienceMin: raw.experienceMin || 10,
-            experienceMax: raw.experienceMax || 16,
-            skills: raw.skills,
-            roleFamily: raw.roleFamily || "Senior Technical Lead",
+            originalSalary: parsedSalary.originalSalary,
+            originalCurrency: parsedSalary.originalCurrency,
+            convertedSalary: parsedSalary.convertedSalary,
+            conversionDate: parsedSalary.conversionDate,
+            isSalaryEstimated: parsedSalary.isEstimated,
+
+            // Seniority & Skills
+            seniority: seniorityResult.level,
+            seniorityEvidence: seniorityResult.evidence,
+            experienceMin: seniorityResult.experienceMin || 10,
+            experienceMax: seniorityResult.experienceMax || 16,
+            skills: normalizedSkills,
+            roleFamily: roleClassification.primary,
+            secondaryRoleFamilies: roleClassification.secondary,
+
             travel,
             description: raw.description,
             source: raw.source,
             url: raw.url,
             postedAt: raw.postedAt,
             discoveredAt: raw.discoveredAt || new Date().toISOString(),
+            lastVerifiedAt: new Date().toISOString(),
+            freshness: freshness.freshness,
+            postedDaysAgo: freshness.daysAgo,
+            dataQualityWarnings: warnings.length > 0 ? warnings : undefined,
             status: "DISCOVERED",
             isDemo: false,
             match,
@@ -241,6 +287,25 @@ export class JobIngestionService {
       }
     }
 
+    const relevanceBreakdown = {
+      highRelevance: 0,
+      relevant: 0,
+      possible: 0,
+      lowRelevance: 0,
+    };
+
+    for (const j of deduplicated) {
+      if (j.match?.relevanceBucket === "HIGH_RELEVANCE") {
+        relevanceBreakdown.highRelevance++;
+      } else if (j.match?.relevanceBucket === "RELEVANT") {
+        relevanceBreakdown.relevant++;
+      } else if (j.match?.relevanceBucket === "POSSIBLE") {
+        relevanceBreakdown.possible++;
+      } else {
+        relevanceBreakdown.lowRelevance++;
+      }
+    }
+
     const metrics: MarketScanMetrics = {
       providersQueried,
       rawJobsCount,
@@ -248,6 +313,7 @@ export class JobIngestionService {
       finalJobsCount,
       locationBreakdown,
       travelBreakdown,
+      relevanceBreakdown,
     };
 
     return {

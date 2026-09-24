@@ -2,6 +2,8 @@
 
 import type { Job } from "@/types";
 import { useState } from "react";
+import { formatRoleFamily } from "@/lib/roleClassifier";
+import { formatSeniorityLevel } from "@/lib/seniorityDetector";
 
 interface JobCardProps {
   job: Job;
@@ -20,31 +22,50 @@ export function JobCard({
 }: JobCardProps) {
   const [showAllReasons, setShowAllReasons] = useState(false);
 
-  // Salary presentation
-  let salaryText = "Salary Undisclosed";
-  if (job.salaryDisclosed && job.salaryLpaMin) {
+  // Relevance styling
+  const bucket = job.match?.relevanceBucket || "POSSIBLE";
+  const relevanceConfig = {
+    HIGH_RELEVANCE: {
+      label: "🌟 HIGH RELEVANCE",
+      style: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40 font-bold",
+    },
+    RELEVANT: {
+      label: "✨ RELEVANT",
+      style: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-semibold",
+    },
+    POSSIBLE: {
+      label: "🔍 POSSIBLE",
+      style: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    },
+    LOW_RELEVANCE: {
+      label: "LOW RELEVANCE",
+      style: "bg-slate-800/80 text-slate-400 border-slate-700",
+    },
+  }[bucket];
+
+  // Salary presentation with clear distinction between confirmed and estimated conversion
+  let salaryDisplay = "Salary Undisclosed";
+  if (job.salaryState === "SALARY_CONFIRMED" || job.salaryState === "SALARY_RANGE") {
     if (job.salaryLpaMax && job.salaryLpaMax !== job.salaryLpaMin) {
-      salaryText = `₹${job.salaryLpaMin}L – ₹${job.salaryLpaMax}L PA`;
-    } else {
-      salaryText = `₹${job.salaryLpaMin}L+ PA`;
+      salaryDisplay = `₹${job.salaryLpaMin}L – ₹${job.salaryLpaMax}L PA`;
+    } else if (job.salaryLpaMin) {
+      salaryDisplay = `₹${job.salaryLpaMin}L+ PA`;
     }
+  } else if (job.salaryState === "SALARY_ESTIMATED") {
+    salaryDisplay = `${job.originalSalary || `$${Math.round((job.salaryMin || 0) / 1000)}k`} (Est: ~₹${job.salaryLpaMin}L PA)`;
   }
 
-
-  // Experience presentation
-  const expText =
-    job.experienceMin !== undefined
-      ? `${job.experienceMin}${job.experienceMax ? `–${job.experienceMax}` : "+"} yrs exp`
-      : "12+ yrs level";
-
-  // Match score color
-  const score = job.match?.overallScore || 0;
-  const scoreColor =
-    score >= 80
-      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-      : score >= 60
-      ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
-      : "bg-amber-500/15 text-amber-400 border-amber-500/30";
+  // Freshness presentation
+  const freshnessLabel =
+    job.postedDaysAgo !== undefined
+      ? job.postedDaysAgo === 0
+        ? "Posted today"
+        : job.postedDaysAgo === 1
+        ? "Posted 1d ago"
+        : `Posted ${job.postedDaysAgo}d ago`
+      : job.postedAt
+      ? `Posted on ${new Date(job.postedAt).toLocaleDateString()}`
+      : "Discovered recently";
 
   return (
     <article
@@ -53,23 +74,36 @@ export function JobCard({
           ? "border-cyan-500/40 bg-slate-900/90 shadow-lg shadow-cyan-950/20"
           : job.status === "APPLIED"
           ? "border-indigo-500/40 bg-slate-900/90"
+          : job.status === "IGNORED"
+          ? "border-slate-850 bg-slate-950/60 opacity-60 hover:opacity-100"
+          : bucket === "HIGH_RELEVANCE"
+          ? "border-emerald-500/30 bg-slate-900/80 hover:border-emerald-500/50"
           : "border-slate-800 bg-slate-900/70 hover:border-slate-700"
       }`}
     >
-      {/* Demo Badge Banner if demo data */}
-      {job.isDemo && (
-        <div className="mb-4 inline-flex items-center gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300">
-          <span>⚠️ DEMO DATA</span>
-          <span className="text-amber-400/80 font-normal">
-            — Sample Verification Listing (Not a current live vacancy)
-          </span>
-        </div>
-      )}
+      {/* Top Banners: Demo Data & Data Quality Warnings */}
+      <div className="flex flex-wrap items-center gap-2 mb-3.5">
+        {job.isDemo && (
+          <div className="inline-flex items-center gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300">
+            <span>⚠️ DEMO DATA</span>
+            <span className="text-amber-400/80 font-normal">
+              — Sample Verification Listing (Not a current live vacancy)
+            </span>
+          </div>
+        )}
+
+        {job.dataQualityWarnings && job.dataQualityWarnings.length > 0 && (
+          <div className="inline-flex items-center gap-1.5 rounded-md bg-rose-500/15 border border-rose-500/30 px-2.5 py-1 text-[11px] font-medium text-rose-300">
+            <span>⚠️ Quality Notice:</span>
+            <span>{job.dataQualityWarnings.join("; ")}</span>
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
         {/* Main Content */}
         <div className="flex-1 space-y-3.5">
-          {/* Header Row: Title, Company, Source Badges */}
+          {/* Header Row: Title, Relevance Badge, Live Status */}
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="text-lg font-bold text-white tracking-tight hover:text-cyan-400 transition-colors">
@@ -78,11 +112,11 @@ export function JobCard({
                 </a>
               </h3>
 
-              {/* Match Score Badge */}
+              {/* Deterministic Relevance Badge */}
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${scoreColor}`}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs border ${relevanceConfig.style}`}
               >
-                ★ {score}% Match
+                {relevanceConfig.label}
               </span>
 
               {/* Live or Demo Badge */}
@@ -103,10 +137,16 @@ export function JobCard({
               </span>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-300 font-medium">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-slate-300 font-medium">
               <span className="text-white font-semibold">{job.company}</span>
               <span className="text-slate-600">•</span>
-              <span className="text-slate-400">{job.roleFamily}</span>
+              <span className="rounded bg-indigo-950/60 border border-indigo-800/60 px-2 py-0.5 text-xs text-indigo-300 font-semibold">
+                {formatRoleFamily(job.roleFamily)}
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="rounded bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 text-xs text-cyan-300">
+                {formatSeniorityLevel(job.seniority)}
+              </span>
               <span className="text-slate-600">•</span>
               <span className="rounded bg-slate-800/80 px-2 py-0.5 text-xs text-slate-400">
                 Source: {job.source}
@@ -114,11 +154,20 @@ export function JobCard({
             </div>
           </div>
 
-          {/* Quick Metrics Bar: Location, Remote, Salary, Experience, Travel */}
-          <div className="flex flex-wrap items-center gap-2.5 text-xs">
-            {/* Location */}
-            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-800/70 border border-slate-700/60 px-2.5 py-1 text-slate-300">
+          {/* Quick Metrics Bar: Location, Remote, Salary, Travel, Freshness */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {/* Location & India Eligibility */}
+            <span
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-medium border ${
+                job.normalizedLocation === "HYDERABAD"
+                  ? "bg-cyan-950/80 text-cyan-300 border-cyan-700/70 font-semibold"
+                  : job.isIndiaEligible
+                  ? "bg-slate-800/80 text-slate-200 border-slate-700"
+                  : "bg-rose-950/60 text-rose-300 border-rose-800/50"
+              }`}
+            >
               📍 {job.location}
+              {job.isIndiaEligible && <span className="ml-1 text-[10px] text-emerald-400 font-bold">(India Eligible)</span>}
             </span>
 
             {/* Remote Type */}
@@ -134,27 +183,32 @@ export function JobCard({
               🌐 {job.remoteType}
             </span>
 
-            {/* Compensation */}
+            {/* Compensation & State */}
             <span
               className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-medium border ${
-                job.salaryDisclosed
-                  ? "bg-emerald-950/50 text-emerald-300 border-emerald-800/60"
+                job.salaryState === "SALARY_CONFIRMED" || job.salaryState === "SALARY_RANGE"
+                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-800/60"
+                  : job.salaryState === "SALARY_ESTIMATED"
+                  ? "bg-indigo-950/60 text-indigo-300 border-indigo-800/60"
                   : "bg-slate-800/50 text-slate-400 border-slate-700/50"
               }`}
             >
-              💰 {salaryText}
+              💰 {salaryDisplay}
+              {job.salaryState === "SALARY_ESTIMATED" && (
+                <span className="text-[10px] text-indigo-400 font-normal ml-0.5">(Est)</span>
+              )}
             </span>
 
             {/* Experience */}
             <span className="inline-flex items-center gap-1 rounded-lg bg-slate-800/70 border border-slate-700/60 px-2.5 py-1 text-slate-300">
-              ⏳ {expText}
+              ⏳ {job.experienceMin ? `${job.experienceMin}+ yrs exp` : "12+ yrs level"}
             </span>
 
             {/* Travel Requirement Badge */}
             <span
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium border ${
                 job.travel.type === "INTERNATIONAL_TRAVEL"
-                  ? "bg-indigo-950/90 text-indigo-300 border-indigo-700/80 animate-pulse font-bold"
+                  ? "bg-indigo-950/90 text-indigo-300 border-indigo-700/80 font-bold"
                   : job.travel.type === "CLIENT_SITE_TRAVEL"
                   ? "bg-cyan-950/80 text-cyan-300 border-cyan-700/80 font-bold"
                   : job.travel.type === "INTERNATIONAL_TEAM_ONLY"
@@ -173,9 +227,14 @@ export function JobCard({
               {job.travel.type === "UNKNOWN" && "Travel Unknown"}
               {job.travel.percentage ? ` (${job.travel.percentage}%)` : ""}
             </span>
+
+            {/* Freshness */}
+            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-800/50 border border-slate-700/50 px-2.5 py-1 text-[11px] text-slate-400">
+              🕒 {freshnessLabel}
+            </span>
           </div>
 
-          {/* Travel Evidence Display */}
+          {/* Travel Evidence Quote */}
           {job.travel.evidence && job.travel.type !== "NO_TRAVEL_MENTIONED" && (
             <div className="rounded-lg bg-indigo-950/40 border border-indigo-900/60 px-3 py-1.5 text-xs text-indigo-200">
               <span className="font-semibold text-indigo-400 mr-1.5">Travel Evidence:</span>
@@ -183,22 +242,7 @@ export function JobCard({
             </div>
           )}
 
-          {/* Travel Destinations if available */}
-          {job.travel.destinations && job.travel.destinations.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-indigo-300">
-              <span className="font-semibold text-slate-400">Target Destinations:</span>
-              {job.travel.destinations.map((dest) => (
-                <span
-                  key={dest}
-                  className="rounded bg-indigo-950/90 border border-indigo-800/70 px-2 py-0.5 font-medium"
-                >
-                  {dest}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Skills Tags */}
+          {/* Normalized Skills Tags */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {job.skills.map((skill) => (
               <span
@@ -210,40 +254,55 @@ export function JobCard({
             ))}
           </div>
 
-          {/* Transparent Match Reasons Section */}
+          {/* Why this matches (Concrete Reasons) */}
           {job.match?.reasons && job.match.reasons.length > 0 && (
-            <div className="mt-3 rounded-xl border border-slate-800/80 bg-slate-950/70 p-3.5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-                  <span>🎯 PROFILE MATCH CRITERIA</span>
+            <div className="mt-3 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <span>✓ WHY THIS MATCHES</span>
                   <span className="text-slate-500 font-normal">
-                    (Rule-based transparent evaluation)
+                    (Deterministic Rule-Based Match)
                   </span>
                 </span>
-                {job.match.reasons.length > 4 && (
+                {job.match.reasons.length > 3 && (
                   <button
                     onClick={() => setShowAllReasons(!showAllReasons)}
                     className="text-[11px] text-cyan-400 hover:underline"
                   >
-                    {showAllReasons ? "Show fewer" : `+${job.match.reasons.length - 4} more`}
+                    {showAllReasons ? "Show fewer" : `+${job.match.reasons.length - 3} more`}
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-slate-300">
-                {(showAllReasons ? job.match.reasons : job.match.reasons.slice(0, 4)).map(
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-slate-200">
+                {(showAllReasons ? job.match.reasons : job.match.reasons.slice(0, 3)).map(
                   (reason, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 font-mono text-[11px]">
+                    <div key={idx} className="flex items-center gap-1.5 font-medium text-[11px]">
                       <span className="text-emerald-400 font-bold">✓</span>
                       <span>{reason.replace(/^✓\s*/, "")}</span>
                     </div>
                   )
                 )}
               </div>
+
+              {/* Why it may NOT match (Cautions) */}
+              {job.match.cautions && job.match.cautions.length > 0 && (
+                <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                    ⚠️ WHY IT MAY NOT MATCH / CAUTIONS
+                  </span>
+                  {job.match.cautions.map((caution, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-[11px] text-amber-300/90 font-medium">
+                      <span className="text-amber-400 font-bold">!</span>
+                      <span>{caution.replace(/^!\s*/, "")}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Deduplication: Multiple Sources Section */}
+          {/* Deduplication Reference */}
           {job.otherSources && job.otherSources.length > 1 && (
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-400">
               <span className="font-semibold text-slate-500">Also discovered on:</span>
@@ -262,29 +321,6 @@ export function JobCard({
                 ))}
             </div>
           )}
-
-          {/* Dates & Sourcing Footnote */}
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 pt-1">
-            <span>
-              Discovered: {new Date(job.discoveredAt).toLocaleDateString()}
-            </span>
-            {job.postedAt && (
-              <>
-                <span>•</span>
-                <span>
-                  Posted: {new Date(job.postedAt).toLocaleDateString()}
-                </span>
-              </>
-            )}
-            {job.appliedAt && (
-              <>
-                <span>•</span>
-                <span className="text-indigo-400 font-medium">
-                  Applied on: {new Date(job.appliedAt).toLocaleDateString()}
-                </span>
-              </>
-            )}
-          </div>
         </div>
 
         {/* Actions Button Panel */}
@@ -312,7 +348,7 @@ export function JobCard({
             🚀 Apply / Open
           </a>
 
-          {/* Mark Applied Quick Action */}
+          {/* Mark as Applied */}
           {job.status !== "APPLIED" && (
             <button
               onClick={() => onStatusChange?.(job, "APPLIED")}

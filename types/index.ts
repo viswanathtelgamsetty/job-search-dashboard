@@ -60,18 +60,73 @@ export interface JobSourceReference {
   externalId?: string;
 }
 
+export type RoleFamily =
+  | "FRONTEND_ARCHITECT"
+  | "TECHNICAL_ARCHITECT"
+  | "SOLUTIONS_ARCHITECT"
+  | "TECHNICAL_LEAD"
+  | "SENIOR_FRONTEND_ENGINEER"
+  | "SOLUTIONS_ENGINEER"
+  | "TECHNICAL_CONSULTANT"
+  | "IMPLEMENTATION_CONSULTANT"
+  | "PROFESSIONAL_SERVICES"
+  | "CMS_DIGITAL_EXPERIENCE"
+  | "COMMERCE"
+  | "ENTERPRISE_INTEGRATION"
+  | "OTHER";
+
+export type SeniorityLevel =
+  | "ENTRY"
+  | "MID"
+  | "SENIOR"
+  | "LEAD"
+  | "STAFF"
+  | "PRINCIPAL"
+  | "ARCHITECT"
+  | "DIRECTOR"
+  | "UNKNOWN";
+
+export type RelevanceBucket =
+  | "HIGH_RELEVANCE"
+  | "RELEVANT"
+  | "POSSIBLE"
+  | "LOW_RELEVANCE";
+
+export type SalaryState =
+  | "SALARY_CONFIRMED"
+  | "SALARY_RANGE"
+  | "SALARY_ESTIMATED"
+  | "SALARY_NOT_DISCLOSED";
+
+export type FreshnessStatus =
+  | "FRESH"
+  | "RECENT"
+  | "OLDER"
+  | "UNKNOWN";
+
+export interface MatchCriterion {
+  matched: boolean;
+  evidence: string[];
+  reason: string;
+}
+
 export interface JobMatchDetails {
-  overallScore: number; // 0 - 100
-  reasons: string[]; // e.g. ["✓ React", "✓ 12+ years", "✓ Hyderabad / Remote"]
-  missingOrNeutral: string[];
+  relevanceBucket: RelevanceBucket;
+  reasons: string[]; // 2-5 concrete reasons ("✓ ...")
+  cautions: string[]; // Reasons why it may not match ("! ...")
+  missingOrNeutral?: string[];
   breakdown: {
-    roleMatch: boolean;
-    techStackMatch: boolean;
-    experienceMatch: boolean;
-    locationMatch: boolean;
-    salaryMatch: boolean;
-    travelMatch: boolean;
+    roleMatch: MatchCriterion;
+    technologyMatch: MatchCriterion;
+    experienceMatch: MatchCriterion;
+    locationMatch: MatchCriterion;
+    remoteMatch: MatchCriterion;
+    travelMatch: MatchCriterion;
+    seniorityMatch: MatchCriterion;
+    salaryMatch: MatchCriterion;
+    clientFacingMatch: MatchCriterion;
   };
+  overallScore?: number; // Deterministic legacy score helper
 }
 
 export interface Job {
@@ -81,32 +136,49 @@ export interface Job {
   company: string;
   normalizedCompany: string;
   location: string;
+  rawLocation?: string;
   normalizedLocation: NormalizedLocation;
   remoteType: RemoteType;
+  isIndiaEligible: boolean;
+  indiaEligibilityReason?: string;
 
-  // Compensation
+  // Compensation Quality
+  salaryState: SalaryState;
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
   salaryLpaMin?: number; // In INR Lakhs Per Annum
   salaryLpaMax?: number;
   salaryDisclosed: boolean;
+  originalSalary?: string;
+  originalCurrency?: string;
+  convertedSalary?: string;
+  conversionDate?: string;
+  isSalaryEstimated?: boolean;
 
-  // Experience requirement
+  // Seniority & Experience
+  seniority: SeniorityLevel;
+  seniorityEvidence?: string;
   experienceMin?: number;
   experienceMax?: number;
 
+  // Skills & Role Families
   skills: string[];
-  roleFamily: string;
+  roleFamily: RoleFamily;
+  secondaryRoleFamilies?: RoleFamily[];
   travel: TravelDetails;
   description?: string;
 
-  // Sourcing & Discovery
+  // Sourcing & Discovery & Quality
   source: string;
   url: string;
   otherSources?: JobSourceReference[];
   postedAt?: string;
   discoveredAt: string;
+  lastVerifiedAt?: string;
+  freshness: FreshnessStatus;
+  postedDaysAgo?: number;
+  dataQualityWarnings?: string[];
 
   // Lifecycle
   status: JobStatus;
@@ -196,6 +268,12 @@ export interface MarketScanMetrics {
     noTravelMentioned: number;
     relocation: number;
   };
+  relevanceBreakdown?: {
+    highRelevance: number;
+    relevant: number;
+    possible: number;
+    lowRelevance: number;
+  };
 }
 
 export interface JobFiltersState {
@@ -207,6 +285,11 @@ export interface JobFiltersState {
   roleFamily: string;
   travelType: string;
   source: string;
+  technology: string;
+  relevance: string;
+  company: string;
+  salaryState?: string;
+  freshness?: string;
   postedWithinDays: number | null;
   sortBy: "newest" | "relevance" | "salary" | "travel" | "location";
 }

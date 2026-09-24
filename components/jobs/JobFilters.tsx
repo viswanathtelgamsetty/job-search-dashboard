@@ -8,6 +8,7 @@ interface JobFiltersProps {
   onReset: () => void;
   availableSources: string[];
   availableRoleFamilies: string[];
+  availableCompanies: string[];
   totalCount: number;
   filteredCount: number;
 }
@@ -18,6 +19,7 @@ export function JobFilters({
   onReset,
   availableSources,
   availableRoleFamilies,
+  availableCompanies,
   totalCount,
   filteredCount,
 }: JobFiltersProps) {
@@ -33,6 +35,10 @@ export function JobFilters({
     filters.roleFamily !== "ALL" ||
     filters.travelType !== "ALL" ||
     filters.source !== "ALL" ||
+    filters.technology !== "ALL" ||
+    filters.relevance !== "ALL" ||
+    filters.company !== "ALL" ||
+    filters.experienceLevel !== "ALL" ||
     filters.postedWithinDays !== null;
 
   return (
@@ -45,7 +51,7 @@ export function JobFilters({
             type="text"
             value={filters.search}
             onChange={(e) => update({ search: e.target.value })}
-            placeholder="Search by keyword, title, company, or skills (e.g. React, Contentful, Next.js)..."
+            placeholder="Search by title, company, skills, or notes (e.g. React, Contentful, Next.js)..."
             className="w-full rounded-xl border border-slate-700 bg-slate-950 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-cyan-500 transition"
           />
           {filters.search && (
@@ -69,36 +75,67 @@ export function JobFilters({
             aria-label="Sort jobs by"
             className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs text-slate-200 outline-none focus:border-cyan-500 font-medium"
           >
-            <option value="newest">🕒 Newest Discovered</option>
-            <option value="relevance">🎯 Best Profile Match</option>
-            <option value="salary">💰 Highest Salary</option>
+            <option value="relevance">🎯 Relevance (High First)</option>
+            <option value="newest">🕒 Newest Posted / Discovered</option>
             <option value="travel">✈️ International Travel First</option>
+            <option value="salary">💰 Highest Salary</option>
             <option value="location">📍 Location</option>
           </select>
         </div>
       </div>
 
-      {/* Primary Quick Filter Chips */}
+      {/* Primary Relevance Quick Buttons */}
       <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
         <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider mr-1">
-          Quick Filters:
+          Relevance:
         </span>
 
-        {/* Remote Toggle */}
         <button
           onClick={() =>
             update({
-              remoteType: filters.remoteType === "REMOTE" ? "ALL" : "REMOTE",
+              relevance: filters.relevance === "HIGH_RELEVANCE" ? "ALL" : "HIGH_RELEVANCE",
             })
           }
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-            filters.remoteType === "REMOTE"
-              ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
+            filters.relevance === "HIGH_RELEVANCE"
+              ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold"
               : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
           }`}
         >
-          🌐 Remote Only
+          🌟 High Relevance
         </button>
+
+        <button
+          onClick={() =>
+            update({
+              relevance: filters.relevance === "RELEVANT" ? "ALL" : "RELEVANT",
+            })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            filters.relevance === "RELEVANT"
+              ? "border-cyan-500 bg-cyan-500/20 text-cyan-300"
+              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+          }`}
+        >
+          ✨ Relevant
+        </button>
+
+        <button
+          onClick={() =>
+            update({
+              relevance: filters.relevance === "POSSIBLE" ? "ALL" : "POSSIBLE",
+            })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            filters.relevance === "POSSIBLE"
+              ? "border-amber-500 bg-amber-500/20 text-amber-300"
+              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+          }`}
+        >
+          🔍 Possible
+        </button>
+
+        <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
 
         {/* Hyderabad Toggle */}
         <button
@@ -116,20 +153,20 @@ export function JobFilters({
           📍 Hyderabad
         </button>
 
-        {/* ₹35L+ Compensation Toggle */}
+        {/* Remote India Toggle */}
         <button
           onClick={() =>
             update({
-              minSalaryLpa: filters.minSalaryLpa === 35 ? null : 35,
+              location: filters.location === "REMOTE_INDIA" ? "ALL" : "REMOTE_INDIA",
             })
           }
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-            filters.minSalaryLpa === 35
+            filters.location === "REMOTE_INDIA"
               ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
               : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
           }`}
         >
-          💰 ₹35 LPA+
+          🇮🇳 Remote India
         </button>
 
         {/* International Travel Toggle */}
@@ -137,42 +174,21 @@ export function JobFilters({
           onClick={() =>
             update({
               travelType:
-                filters.travelType === "INTERNATIONAL_TRAVEL" || filters.travelType === "INTERNATIONAL"
-                  ? "ALL"
-                  : "INTERNATIONAL_TRAVEL",
+                filters.travelType === "INTERNATIONAL_TRAVEL" ? "ALL" : "INTERNATIONAL_TRAVEL",
             })
           }
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-            filters.travelType === "INTERNATIONAL_TRAVEL" || filters.travelType === "INTERNATIONAL"
-              ? "border-indigo-500 bg-indigo-500/20 text-indigo-300 shadow-sm shadow-indigo-950"
+            filters.travelType === "INTERNATIONAL_TRAVEL"
+              ? "border-indigo-500 bg-indigo-500/20 text-indigo-300 shadow-sm"
               : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
           }`}
         >
           ✈️ International Travel
         </button>
-
-        {/* Client-Site Travel Toggle */}
-        <button
-          onClick={() =>
-            update({
-              travelType:
-                filters.travelType === "CLIENT_SITE_TRAVEL" || filters.travelType === "CLIENT_SITE"
-                  ? "ALL"
-                  : "CLIENT_SITE_TRAVEL",
-            })
-          }
-          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-            filters.travelType === "CLIENT_SITE_TRAVEL" || filters.travelType === "CLIENT_SITE"
-              ? "border-cyan-500 bg-cyan-500/20 text-cyan-300"
-              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
-          }`}
-        >
-          🏢 Client-Site Travel
-        </button>
       </div>
 
       {/* Advanced Filter Row (Dropdowns) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 pt-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-2">
         {/* Role Family */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
@@ -181,12 +197,12 @@ export function JobFilters({
           <select
             value={filters.roleFamily}
             onChange={(e) => update({ roleFamily: e.target.value })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
-            <option value="ALL">All Role Families</option>
+            <option value="ALL">All Roles</option>
             {availableRoleFamilies.map((rf) => (
               <option key={rf} value={rf}>
-                {rf}
+                {rf.replace(/_/g, " ")}
               </option>
             ))}
           </select>
@@ -195,32 +211,123 @@ export function JobFilters({
         {/* Location Dropdown */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Target Location
+            Location
           </label>
           <select
             value={filters.location}
             onChange={(e) => update({ location: e.target.value })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
             <option value="ALL">All Locations</option>
-            <option value="HYDERABAD">Hyderabad (Target City)</option>
+            <option value="HYDERABAD">Hyderabad (Target)</option>
             <option value="BANGALORE">Bangalore / Bengaluru</option>
             <option value="PUNE">Pune</option>
+            <option value="CHENNAI">Chennai</option>
+            <option value="MUMBAI">Mumbai</option>
+            <option value="DELHI_NCR">Delhi NCR / Gurgaon</option>
             <option value="INDIA">All India (Metro & Remote)</option>
             <option value="REMOTE_INDIA">Remote from India</option>
             <option value="REMOTE_GLOBAL">Worldwide Remote</option>
           </select>
         </div>
 
+        {/* Technology */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Technology
+          </label>
+          <select
+            value={filters.technology}
+            onChange={(e) => update({ technology: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Technologies</option>
+            <option value="React">React</option>
+            <option value="Next.js">Next.js</option>
+            <option value="TypeScript">TypeScript</option>
+            <option value="Contentful">Contentful</option>
+            <option value="Headless CMS">Headless CMS</option>
+            <option value="Angular">Angular</option>
+            <option value="Commerce">Commerce</option>
+            <option value="Digital Experience">Digital Experience</option>
+            <option value="Frontend Architecture">Frontend Architecture</option>
+            <option value="Node.js">Node.js</option>
+            <option value="GraphQL">GraphQL</option>
+            <option value="Design Systems">Design Systems</option>
+          </select>
+        </div>
+
+        {/* Seniority / Experience */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Seniority
+          </label>
+          <select
+            value={filters.experienceLevel}
+            onChange={(e) => update({ experienceLevel: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Levels</option>
+            <option value="ARCHITECT">Architect</option>
+            <option value="LEAD">Lead / Tech Lead</option>
+            <option value="PRINCIPAL">Principal</option>
+            <option value="STAFF">Staff Engineer</option>
+            <option value="SENIOR">Senior</option>
+            <option value="12PLUS">12+ Years Experience</option>
+          </select>
+        </div>
+
+        {/* Travel Category */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Travel
+          </label>
+          <select
+            value={filters.travelType}
+            onChange={(e) => update({ travelType: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Travel Types</option>
+            <option value="INTERNATIONAL_TRAVEL">✈️ International Travel</option>
+            <option value="CLIENT_SITE_TRAVEL">🏢 Client-Site Travel</option>
+            <option value="INTERNATIONAL_TEAM_ONLY">🌐 International Team Only</option>
+            <option value="REMOTE_GLOBAL">🌍 Remote Global</option>
+            <option value="RELOCATION">📦 Relocation</option>
+            <option value="NO_TRAVEL_MENTIONED">No Travel Mentioned</option>
+          </select>
+        </div>
+
+        {/* Company Filter */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Company
+          </label>
+          <select
+            value={filters.company}
+            onChange={(e) => update({ company: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Companies</option>
+            {availableCompanies.slice(0, 30).map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Secondary Filter Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 border-t border-slate-800/60">
         {/* Work Model */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Workplace Model
+            Remote / Work Model
           </label>
           <select
             value={filters.remoteType}
             onChange={(e) => update({ remoteType: e.target.value })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
             <option value="ALL">All Models</option>
             <option value="REMOTE">100% Remote</option>
@@ -229,17 +336,38 @@ export function JobFilters({
           </select>
         </div>
 
-        {/* Source Provider */}
+        {/* Salary Filter */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Job Source
+            Compensation
+          </label>
+          <select
+            value={filters.minSalaryLpa === null ? "ALL" : String(filters.minSalaryLpa)}
+            onChange={(e) =>
+              update({
+                minSalaryLpa: e.target.value === "ALL" ? null : parseInt(e.target.value, 10),
+              })
+            }
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">Any / Open Budget</option>
+            <option value="35">≥ ₹35 LPA</option>
+            <option value="40">≥ ₹40 LPA</option>
+            <option value="50">≥ ₹50 LPA</option>
+          </select>
+        </div>
+
+        {/* Job Source */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Source Provider
           </label>
           <select
             value={filters.source}
             onChange={(e) => update({ source: e.target.value })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
-            <option value="ALL">All Permitted Sources</option>
+            <option value="ALL">All Sources</option>
             {availableSources.map((src) => (
               <option key={src} value={src}>
                 {src}
@@ -251,7 +379,7 @@ export function JobFilters({
         {/* Posted Recency */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Posted Date
+            Freshness / Posted Date
           </label>
           <select
             value={filters.postedWithinDays === null ? "ALL" : String(filters.postedWithinDays)}
@@ -261,13 +389,13 @@ export function JobFilters({
                   e.target.value === "ALL" ? null : parseInt(e.target.value, 10),
               })
             }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
             <option value="ALL">Anytime</option>
             <option value="1">Last 24 Hours</option>
-            <option value="3">Last 3 Days</option>
+            <option value="3">Last 3 Days (Fresh)</option>
             <option value="7">Last 7 Days</option>
-            <option value="14">Last 14 Days</option>
+            <option value="14">Last 14 Days (Recent)</option>
             <option value="30">Last 30 Days</option>
           </select>
         </div>
@@ -277,7 +405,7 @@ export function JobFilters({
       <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
         <div>
           Showing <span className="font-semibold text-white">{filteredCount}</span> of{" "}
-          <span className="font-semibold text-slate-300">{totalCount}</span> active opportunities
+          <span className="font-semibold text-slate-300">{totalCount}</span> opportunities
         </div>
 
         {isFiltered && (

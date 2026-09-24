@@ -5,7 +5,7 @@ import type { Job, MarketScanMetrics, ProviderStatus } from "@/types";
 import { setLastSyncTime } from "@/lib/storage";
 
 interface SyncButtonProps {
-  onSyncComplete: (newJobs: Job[]) => void;
+  onSyncComplete: (newJobs: Job[], providers?: ProviderStatus[]) => void;
   existingJobs: Job[];
 }
 
@@ -35,7 +35,7 @@ export function SyncButton({ onSyncComplete, existingJobs }: SyncButtonProps) {
       if (data.success && Array.isArray(data.jobs)) {
         const now = new Date().toISOString();
         setLastSyncTime(now);
-        onSyncComplete(data.jobs);
+        onSyncComplete(data.jobs, data.providers);
 
         if (data.metrics) {
           setMetrics(data.metrics);
