@@ -57,11 +57,54 @@ export function updateJobStatusInStorage(
     if (job.id !== jobId) return job;
 
     const isApplying = status === "APPLIED" && !job.appliedAt;
+    const isSaving = status === "SAVED" && !job.savedAt;
+    const isIgnoring = status === "IGNORED" && !job.ignoredAt;
+
     return {
       ...job,
       status,
       notes: notes !== undefined ? notes : job.notes,
       appliedAt: isApplying ? now : job.appliedAt,
+      savedAt: isSaving ? now : job.savedAt,
+      ignoredAt: isIgnoring ? now : (status !== "IGNORED" ? undefined : job.ignoredAt),
+      ignoreReason: status !== "IGNORED" ? undefined : job.ignoreReason,
+      updatedAt: now,
+    };
+  });
+
+  saveJobs(updated);
+  return updated;
+}
+
+export function ignoreJobInStorage(jobId: string, reason: string): Job[] {
+  const currentJobs = getStoredJobs();
+  const now = new Date().toISOString();
+
+  const updated = currentJobs.map((job) => {
+    if (job.id !== jobId) return job;
+    return {
+      ...job,
+      status: "IGNORED" as JobStatus,
+      ignoredAt: now,
+      ignoreReason: reason,
+      updatedAt: now,
+    };
+  });
+
+  saveJobs(updated);
+  return updated;
+}
+
+export function updateJobUserNotesInStorage(jobId: string, userNotes: string): Job[] {
+  const currentJobs = getStoredJobs();
+  const now = new Date().toISOString();
+
+  const updated = currentJobs.map((job) => {
+    if (job.id !== jobId) return job;
+    return {
+      ...job,
+      userNotes,
+      notes: userNotes,
       updatedAt: now,
     };
   });

@@ -445,7 +445,11 @@ export interface Job {
 
   // Application tracker details
   notes?: string;
+  userNotes?: string;
+  savedAt?: string;
   appliedAt?: string;
+  ignoredAt?: string;
+  ignoreReason?: string;
   lastContactedAt?: string;
   nextStep?: string;
   updatedAt: string;
@@ -601,17 +605,25 @@ export interface JobFiltersState {
     | "salary"
     | "international"
     | "clientFacing"
-    | "market";
+    | "market"
+    | "action_required"
+    | "deadline"
+    | "saved_date"
+    | "followup_date";
   section?: MarketRadarSection;
   opportunityPriority?: string;
   applicationTrackingFilter?: "ALL" | "SAVED" | "APPLIED" | "NEEDS_FOLLOW_UP";
-  // Phase 7 Filters:
+  // Phase 7 & 9 Filters:
   market?: string;
   emeaCountry?: string;
   opportunityType?: string;
   internationalExposure?: string;
   workAuthorization?: string;
   internationalBucket?: string;
+  recommendation?: string;
+  savedAging?: "ALL" | "SAVED_GT_2D" | "SAVED_GT_5D";
+  followUpFilter?: "ALL" | "DUE_TODAY" | "OVERDUE" | "UPCOMING";
+  newSinceLastVisit?: boolean;
 }
 
 export interface Application {
@@ -624,10 +636,13 @@ export interface Application {
   appliedAt?: string;
   lastActivityAt: string;
   nextFollowUpAt?: string;
+  followUpDate?: string;
+  followUpNote?: string;
   resumeVersion?: string;
   coverLetterUsed?: string;
   referral?: boolean;
   referralName?: string;
+  referralNotes?: string;
   recruiterName?: string;
   recruiterEmail?: string;
   recruiterLinkedIn?: string;
@@ -637,6 +652,7 @@ export interface Application {
   noticePeriodDiscussed?: string;
   interviewDates?: string[];
   notes?: string;
+  communicationNotes?: string;
   rejectionReason?: string;
   withdrawalReason?: string;
   source?: string;
@@ -712,6 +728,12 @@ export interface WeeklyActivityBucket {
 }
 
 export interface TodayMetrics {
+  todayDateFormatted?: string;
+  applyNowCount?: number;
+  needsReviewCount?: number;
+  savedNotAppliedCount?: number;
+  followUpsDueToday?: number;
+  recentlyDiscoveredHighPriority?: number;
   newRelevantJobs: number;
   priorityOpportunities: number;
   savedNotApplied: number;

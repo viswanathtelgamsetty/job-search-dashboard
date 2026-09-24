@@ -559,7 +559,17 @@ export function JobDetailModal({
             <span className="font-mono text-slate-500">{job.id.slice(0, 16)}</span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+            {job.url && job.url !== "#" && (
+              <a
+                href={job.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700 transition"
+              >
+                🔗 Open Job ↗
+              </a>
+            )}
+
             {onSave && (
               <button
                 onClick={() => onSave(job)}
@@ -582,7 +592,6 @@ export function JobDetailModal({
               <span>🚀 Apply</span>
               <span>↗</span>
             </button>
-          </div>
         </div>
       </div>
     </div>

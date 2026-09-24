@@ -50,10 +50,13 @@ export function ApplicationDetailModal({
     application.noticePeriodDiscussed || ""
   );
   const [notes, setNotes] = useState(application.notes || "");
+  const [referralNotes, setReferralNotes] = useState(application.referralNotes || "");
+  const [communicationNotes, setCommunicationNotes] = useState(application.communicationNotes || "");
+  const [followUpNote, setFollowUpNote] = useState(application.followUpNote || "");
   const [rejectionReason, setRejectionReason] = useState(application.rejectionReason || "");
   const [withdrawalReason, setWithdrawalReason] = useState(application.withdrawalReason || "");
   const [nextFollowUpDate, setNextFollowUpDate] = useState<string>(
-    application.nextFollowUpAt ? application.nextFollowUpAt.slice(0, 10) : ""
+    application.nextFollowUpAt ? application.nextFollowUpAt.slice(0, 10) : application.followUpDate || ""
   );
   const [interviewDates, setInterviewDates] = useState<string[]>(application.interviewDates || []);
   const [newInterviewDate, setNewInterviewDate] = useState("");
@@ -75,6 +78,7 @@ export function ApplicationDetailModal({
       coverLetterUsed: coverLetterUsed.trim() || undefined,
       referral,
       referralName: referral ? referralName.trim() || undefined : undefined,
+      referralNotes: referral ? referralNotes.trim() || undefined : undefined,
       recruiterName: recruiterName.trim() || undefined,
       recruiterEmail: recruiterEmail.trim() || undefined,
       recruiterLinkedIn: recruiterLinkedIn.trim() || undefined,
@@ -83,9 +87,12 @@ export function ApplicationDetailModal({
       salaryCurrency,
       noticePeriodDiscussed: noticePeriodDiscussed.trim() || undefined,
       notes: notes.trim() || undefined,
+      communicationNotes: communicationNotes.trim() || undefined,
       rejectionReason: status === "REJECTED" ? rejectionReason.trim() || undefined : undefined,
       withdrawalReason: status === "WITHDRAWN" ? withdrawalReason.trim() || undefined : undefined,
       nextFollowUpAt: nextFollowUpDate ? `${nextFollowUpDate}T09:00:00.000Z` : undefined,
+      followUpDate: nextFollowUpDate || undefined,
+      followUpNote: followUpNote.trim() || undefined,
       interviewDates,
     };
 
@@ -368,12 +375,19 @@ export function ApplicationDetailModal({
               </label>
 
               {referral && (
-                <div className="flex-1">
+                <div className="flex-1 space-y-2">
                   <input
                     type="text"
                     value={referralName}
                     onChange={(e) => setReferralName(e.target.value)}
                     placeholder="Referral contact name / relation"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="text"
+                    value={referralNotes}
+                    onChange={(e) => setReferralNotes(e.target.value)}
+                    placeholder="Referral notes or contact context..."
                     className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -447,9 +461,9 @@ export function ApplicationDetailModal({
             </span>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  Next Follow-up Date
+              <div className="space-y-2">
+                <label className="block text-[11px] font-semibold text-slate-400">
+                  Next Follow-up Date & Note
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -468,6 +482,13 @@ export function ApplicationDetailModal({
                     </button>
                   )}
                 </div>
+                <input
+                  type="text"
+                  value={followUpNote}
+                  onChange={(e) => setFollowUpNote(e.target.value)}
+                  placeholder="Follow-up note (e.g. Check in with recruiter about tech screen result)..."
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-amber-500"
+                />
               </div>
 
               <div>
@@ -523,17 +544,32 @@ export function ApplicationDetailModal({
             </div>
 
             {/* Notes */}
-            <div className="pt-2 border-t border-slate-900">
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                Progress Notes & Feedback
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                placeholder="Log interview round details, architecture discussions, salary counters, or next steps..."
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-amber-500"
-              />
+            <div className="pt-2 border-t border-slate-900 space-y-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Progress Notes & Strategy
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Log interview round details, architecture discussions, salary counters, or next steps..."
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Recruiter & Interview Communication Notes
+                </label>
+                <textarea
+                  value={communicationNotes}
+                  onChange={(e) => setCommunicationNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Log recruiter correspondence, interview questions asked, key discussion points..."
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-amber-500"
+                />
+              </div>
             </div>
           </div>
 

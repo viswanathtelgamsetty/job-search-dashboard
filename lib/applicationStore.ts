@@ -148,6 +148,34 @@ export function saveJobAsApplication(job: Job): Application {
  * If Application exists: transitions to APPLIED and updates appliedAt.
  * If no Application exists: creates Application with status = APPLIED.
  */
+/**
+ * Check if a job already has an active or submitted application.
+ */
+export function checkIsAlreadyApplied(jobId: string): {
+  isAlreadyApplied: boolean;
+  appliedAt?: string;
+  status?: ApplicationStatus;
+  application?: Application;
+} {
+  const existing = getApplicationForJob(jobId);
+  if (!existing) {
+    return { isAlreadyApplied: false };
+  }
+  const isAppliedStatus = !["DISCOVERED", "SAVED", "IGNORED"].includes(existing.status);
+  const isApplied = isAppliedStatus || Boolean(existing.appliedAt);
+  return {
+    isAlreadyApplied: isApplied,
+    appliedAt: existing.appliedAt,
+    status: existing.status,
+    application: existing,
+  };
+}
+
+/**
+ * Apply to a job.
+ * If Application exists: transitions to APPLIED and preserves original appliedAt.
+ * If no Application exists: creates Application with status = APPLIED.
+ */
 export function applyToJobAsApplication(job: Job): Application {
   const existing = getApplicationForJob(job.id);
   const now = new Date().toISOString();
@@ -197,6 +225,7 @@ export function updateApplication(
     id: current.id, // Immutable
     jobId: current.jobId, // Immutable
     createdAt: current.createdAt, // Immutable
+    appliedAt: updates.appliedAt !== undefined ? updates.appliedAt : current.appliedAt, // Preserve original appliedAt unless explicitly updated
     updatedAt: now,
     lastActivityAt: updates.lastActivityAt || now,
   };
@@ -221,16 +250,6 @@ export function deleteApplication(id: string): boolean {
 
 /**
  * Deterministic status transitions.
- *
- * Rules:
- * SAVED → APPLIED
- * APPLIED → SCREENING | REJECTED
- * SCREENING → TECHNICAL | REJECTED
- * TECHNICAL → FINAL | REJECTED
- * FINAL → OFFER | REJECTED
- * Any active state → WITHDRAWN | IGNORED
- * Terminal/alternate states (REJECTED, IGNORED, WITHDRAWN) can be reopened.
- * Also supports direct movement between active stages per requirements.
  */
 export function updateApplicationStatus(
   id: string,
@@ -281,24 +300,65 @@ export function updateApplicationStatus(
 
 /**
  * Mark a follow-up as done:
- * Updates lastActivityAt and clears nextFollowUpAt.
+ * Updates lastActivityAt and clears nextFollowUpAt and followUpDate.
  */
 export function markFollowUpDone(id: string): Application | undefined {
   const now = new Date().toISOString();
   return updateApplication(id, {
     nextFollowUpAt: undefined,
+    followUpDate: undefined,
     lastActivityAt: now,
   });
 }
 
 /**
+ * Reschedule a follow-up with optional note.
+ */
+export function rescheduleFollowUp(
+  id: string,
+  newDateIso: string,
+  followUpNote?: string
+): Application | undefined {
+  const now = new Date().toISOString();
+  return updateApplication(id, {
+    nextFollowUpAt: newDateIso,
+    followUpDate: newDateIso.slice(0, 10),
+    followUpNote: followUpNote !== undefined ? followUpNote : undefined,
+    lastActivityAt: now,
+  });
+}
+
+/**
+ * Categorize an application's follow-up state relative to today.
+ */
+export function categorizeFollowUp(
+  app: Application,
+  nowIso?: string
+): "OVERDUE" | "DUE_TODAY" | "UPCOMING" | "NONE" {
+  const targetIso = app.nextFollowUpAt || (app.followUpDate ? `${app.followUpDate}T09:00:00.000Z` : undefined);
+  if (!targetIso) return "NONE";
+
+  const terminalStatuses: ApplicationStatus[] = ["OFFER", "REJECTED", "WITHDRAWN", "IGNORED"];
+  if (terminalStatuses.includes(app.status)) return "NONE";
+
+  const now = nowIso ? new Date(nowIso) : new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const targetStr = targetIso.slice(0, 10);
+
+  if (targetStr < todayStr) return "OVERDUE";
+  if (targetStr === todayStr) return "DUE_TODAY";
+  return "UPCOMING";
+}
+
+/**
  * Check if a follow-up is due for an application.
  * A follow-up is due when:
- * nextFollowUpAt <= now
+ * nextFollowUpAt (or followUpDate) <= now
  * and status is NOT one of: OFFER, REJECTED, WITHDRAWN, IGNORED.
  */
 export function isFollowUpDue(app: Application, nowIso?: string): boolean {
-  if (!app.nextFollowUpAt) return false;
+  const targetIso = app.nextFollowUpAt || (app.followUpDate ? `${app.followUpDate}T00:00:00.000Z` : undefined);
+  if (!targetIso) return false;
 
   const terminalStatuses: ApplicationStatus[] = ["OFFER", "REJECTED", "WITHDRAWN", "IGNORED"];
   if (terminalStatuses.includes(app.status)) {
@@ -306,7 +366,7 @@ export function isFollowUpDue(app: Application, nowIso?: string): boolean {
   }
 
   const checkTime = nowIso ? new Date(nowIso).getTime() : Date.now();
-  const dueTime = new Date(app.nextFollowUpAt).getTime();
+  const dueTime = new Date(targetIso).getTime();
 
   return !isNaN(dueTime) && dueTime <= checkTime;
 }

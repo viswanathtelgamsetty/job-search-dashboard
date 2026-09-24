@@ -12,7 +12,7 @@ import type {
   TodayMetrics,
   WeeklyActivityBucket,
 } from "@/types";
-import { isFollowUpDue } from "./applicationStore.ts";
+import { categorizeFollowUp, isFollowUpDue } from "./applicationStore.ts";
 
 export const SEARCH_PERIOD_STORAGE_KEY = "job-market-radar:search-period:v1";
 
@@ -279,6 +279,37 @@ export function calculateWeeklyActivity(
   return weeklyBuckets;
 }
 
+export interface WeeklyComparisonItem {
+  metric: string;
+  thisWeek: number;
+  previousWeek: number;
+  change: number;
+}
+
+export function calculateWeeklyComparison(
+  weeklyBuckets: WeeklyActivityBucket[]
+): WeeklyComparisonItem[] {
+  if (weeklyBuckets.length === 0) return [];
+  const currentWeek = weeklyBuckets.find((w) => w.isCurrent) || weeklyBuckets[0];
+  const currentIndex = weeklyBuckets.indexOf(currentWeek);
+  const prevWeek = currentIndex > 0 ? weeklyBuckets[currentIndex - 1] : undefined;
+
+  const compare = (valThis: number, valPrev: number, metric: string): WeeklyComparisonItem => ({
+    metric,
+    thisWeek: valThis,
+    previousWeek: valPrev,
+    change: valThis - valPrev,
+  });
+
+  return [
+    compare(currentWeek.applicationsSubmitted, prevWeek?.applicationsSubmitted || 0, "Applications"),
+    compare(currentWeek.jobsSaved, prevWeek?.jobsSaved || 0, "Jobs Saved"),
+    compare(currentWeek.followUpsCompleted, prevWeek?.followUpsCompleted || 0, "Follow-ups Completed"),
+    compare(currentWeek.applicationsProgressed, prevWeek?.applicationsProgressed || 0, "Pipeline Progressions"),
+    compare(currentWeek.jobsDiscovered, prevWeek?.jobsDiscovered || 0, "Jobs Discovered"),
+  ];
+}
+
 /**
  * Computes today's execution snapshot.
  */
@@ -289,13 +320,50 @@ export function calculateTodayMetrics(
 ): TodayMetrics {
   const now = nowIso ? new Date(nowIso) : new Date();
   const todayStr = now.toISOString().slice(0, 10);
-  const todayStartIso = `${todayStr}T00:00:00.000Z`;
+
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  };
+  const todayDateFormatted = now.toLocaleDateString("en-US", dateOptions);
+
+  const applyNowCount = jobs.filter(
+    (j) =>
+      (j.applicationRecommendation || j.match?.applicationRecommendation) === "APPLY_NOW" &&
+      j.status !== "APPLIED" &&
+      j.status !== "IGNORED"
+  ).length;
+
+  const needsReviewCount = jobs.filter(
+    (j) =>
+      (j.applicationRecommendation || j.match?.applicationRecommendation) === "REVIEW" &&
+      j.status !== "APPLIED" &&
+      j.status !== "IGNORED"
+  ).length;
+
+  const savedNotAppliedCount = applications.filter((a) => a.status === "SAVED").length;
+
+  const applicationsSubmittedToday = applications.filter(
+    (a) => a.appliedAt && a.appliedAt.startsWith(todayStr)
+  ).length;
+
+  const followUpsDueToday = applications.filter((a) => {
+    return categorizeFollowUp(a, now.toISOString()) === "DUE_TODAY";
+  }).length;
+
+  const overdueFollowUps = applications.filter((a) => {
+    return categorizeFollowUp(a, now.toISOString()) === "OVERDUE";
+  }).length;
+
+  const followUpsDue = followUpsDueToday + overdueFollowUps;
 
   const newRelevantJobs = jobs.filter((j) => {
     const isRelevant =
       j.careerFit === "HIGH_RELEVANCE" || j.careerFit === "RELEVANT";
     const isToday = j.discoveredAt?.startsWith(todayStr) || j.freshness === "FRESH";
-    return isRelevant && isToday;
+    return isRelevant && isToday && j.status !== "IGNORED";
   }).length;
 
   const priorityOpportunities = jobs.filter(
@@ -305,23 +373,13 @@ export function calculateTodayMetrics(
       j.status !== "IGNORED"
   ).length;
 
-  const savedNotApplied = applications.filter((a) => a.status === "SAVED").length;
-
-  const applicationsSubmittedToday = applications.filter(
-    (a) => a.appliedAt && a.appliedAt.startsWith(todayStr)
+  const recentlyDiscoveredHighPriority = jobs.filter(
+    (j) =>
+      (j.careerFit === "HIGH_RELEVANCE" || j.opportunityPriority === "PRIORITY") &&
+      j.freshness === "FRESH" &&
+      j.status !== "APPLIED" &&
+      j.status !== "IGNORED"
   ).length;
-
-  const followUpsDue = applications.filter((a) =>
-    isFollowUpDue(a, now.toISOString())
-  ).length;
-
-  const overdueFollowUps = applications.filter((a) => {
-    return (
-      a.nextFollowUpAt &&
-      a.nextFollowUpAt < todayStartIso &&
-      isFollowUpDue(a, now.toISOString())
-    );
-  }).length;
 
   const applicationsProgressedToday = applications.filter((a) => {
     return (
@@ -333,9 +391,15 @@ export function calculateTodayMetrics(
   }).length;
 
   return {
+    todayDateFormatted,
+    applyNowCount,
+    needsReviewCount,
+    savedNotAppliedCount,
+    followUpsDueToday,
+    recentlyDiscoveredHighPriority,
     newRelevantJobs,
     priorityOpportunities,
-    savedNotApplied,
+    savedNotApplied: savedNotAppliedCount,
     applicationsSubmittedToday,
     followUpsDue,
     overdueFollowUps,

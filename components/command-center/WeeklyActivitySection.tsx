@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DailyActivityBucket, SearchPeriodSettings, WeeklyActivityBucket } from "@/types";
+import { calculateWeeklyComparison } from "@/lib/searchAnalytics";
 
 interface WeeklyActivitySectionProps {
   weeklyBuckets: WeeklyActivityBucket[];
@@ -20,6 +21,7 @@ export function WeeklyActivitySection({
   const currentWeek = weeklyBuckets.find((w) => w.isCurrent) || weeklyBuckets[0];
   const currentWeekApps = currentWeek ? currentWeek.applicationsSubmitted : 0;
   const currentWeekFollowUps = currentWeek ? currentWeek.followUpsCompleted : 0;
+  const comparisons = calculateWeeklyComparison(weeklyBuckets);
 
   return (
     <section className="space-y-4">
@@ -119,6 +121,38 @@ export function WeeklyActivitySection({
           </div>
         </div>
       </div>
+
+      {/* Weekly Search Summary & Comparison */}
+      {comparisons.length > 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              Weekly Search Summary & Comparison
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Current Week vs. Previous Week (no value judgments)
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {comparisons.map((c, i) => (
+              <div key={i} className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+                <span className="text-[11px] font-medium text-slate-400 block">{c.metric}</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-white">{c.thisWeek}</span>
+                  <span className="text-xs text-slate-500">prev: {c.previousWeek}</span>
+                </div>
+                <span
+                  className={`text-[10px] font-semibold mt-0.5 block ${
+                    c.change > 0 ? "text-emerald-400" : c.change < 0 ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  {c.change > 0 ? `+${c.change}` : `${c.change}`} vs prev week
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* VIEW 1: Weekly Cards (Week 1 through Week 9) */}
       {viewMode === "weekly" ? (
