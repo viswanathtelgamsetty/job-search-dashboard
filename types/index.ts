@@ -467,3 +467,116 @@ export interface ApplicationFunnelMetrics {
   technicalToFinalConversion: number | null;
   finalToOfferConversion: number | null;
 }
+
+// ==========================================
+// Phase 6: 60-Day Job Search Command Center Types
+// ==========================================
+
+export interface SearchPeriodSettings {
+  searchStartDate: string; // YYYY-MM-DD
+  searchEndDate: string; // YYYY-MM-DD
+  durationDays: number; // default 60
+  applicationsPerDayTarget: number; // default 2
+  applicationsPerWeekTarget: number; // default 10
+  followUpsPerWeekTarget: number; // default 5
+  inactiveThresholdDays: number; // default 7
+}
+
+export interface SearchProgress {
+  searchStartDate: string;
+  searchEndDate: string;
+  durationDays: number;
+  currentDay: number; // 1 to durationDays
+  daysRemaining: number;
+  progressPercentage: number;
+  isCompleted: boolean;
+}
+
+export interface DailyActivityBucket {
+  date: string; // YYYY-MM-DD
+  dayNumber: number; // 1 to 60
+  isToday: boolean;
+  jobsDiscovered: number;
+  jobsSaved: number;
+  applicationsSubmitted: number;
+  followUpsCompleted: number;
+  applicationsProgressed: number;
+}
+
+export interface WeeklyActivityBucket {
+  weekNumber: number; // 1 to 9
+  label: string; // "Week 1", ... "Week 9"
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  daysCount: number; // 7 (or partial for final week)
+  isCurrent: boolean;
+  jobsDiscovered: number;
+  jobsSaved: number;
+  applicationsSubmitted: number;
+  followUpsCompleted: number;
+  applicationsProgressed: number;
+}
+
+export interface TodayMetrics {
+  newRelevantJobs: number;
+  priorityOpportunities: number;
+  savedNotApplied: number;
+  applicationsSubmittedToday: number;
+  followUpsDue: number;
+  overdueFollowUps: number;
+  applicationsProgressedToday: number;
+}
+
+export interface DailyAction {
+  id: string;
+  title: string;
+  description: string;
+  count: number;
+  actionUrl: string;
+  badgeType: "urgent" | "attention" | "info" | "neutral";
+  priorityOrder: number;
+}
+
+export interface SearchHealthMetrics {
+  relevantOpportunitiesDiscovered: number;
+  saved: number;
+  applied: number;
+  awaitingResponse: number;
+  screenings: number;
+  technical: number;
+  finalStages: number;
+  offers: number;
+  followUpsDue: number;
+  savedNotApplied: number;
+  appliedNoRecentActivity: number;
+  applicationsWithUpcomingFollowUp: number;
+}
+
+export interface TargetRoleDistribution {
+  domains: Array<{
+    domain: CareerDomain;
+    label: string;
+    count: number;
+  }>;
+  workArrangements: {
+    internationalTravel: number;
+    clientSiteTravel: number;
+    remoteGlobal: number;
+  };
+}
+
+export interface MarketActivityMetrics {
+  totalJobs: number;
+  highCareerFit: number;
+  relevant: number;
+  possible: number;
+  fresh: number;
+  recent: number;
+  hyderabad: number;
+  india: number;
+  remoteIndia: number;
+  globalRemote: number;
+  internationalTravel: number;
+  clientSiteTravel: number;
+}
+
