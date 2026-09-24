@@ -124,12 +124,14 @@ export type CareerDomain =
   | "OTHER";
 
 export type DomainEvidenceSource = "title" | "description" | "skills" | "metadata";
+export type DomainEvidenceStrength = "STRONG" | "MODERATE" | "WEAK";
 
 export interface DomainMatchDetail {
   domain: CareerDomain;
   matched: boolean;
   evidence: string | null;
   source?: DomainEvidenceSource;
+  strength?: DomainEvidenceStrength;
 }
 
 export type FitStrength = "STRONG" | "MODERATE" | "WEAK" | "NONE";
@@ -177,6 +179,7 @@ export interface JobMatchDetails {
   cautions: string[]; // Reasons why it may not match ("! ...")
   potentialGaps: string[]; // "POTENTIAL GAPS"
   domainMatches: DomainMatchDetail[];
+  secondaryEvidenceDomains?: CareerDomain[];
   dimensions: CareerFitDimensions;
   missingOrNeutral?: string[];
   breakdown: {
@@ -236,6 +239,7 @@ export interface Job {
   roleFamily: RoleFamily;
   secondaryRoleFamilies?: RoleFamily[];
   domains: CareerDomain[];
+  secondaryEvidenceDomains?: CareerDomain[];
   domainMatches: DomainMatchDetail[];
   careerFit: RelevanceBucket;
   travel: TravelDetails;

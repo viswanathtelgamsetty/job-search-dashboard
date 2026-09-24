@@ -196,7 +196,8 @@ export class JobIngestionService {
             technologyMatchDetails: match.breakdown.technologyMatch.details || [],
             roleFamily: roleClassification.primary,
             secondaryRoleFamilies: roleClassification.secondary,
-            domains: match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER").map((d) => d.domain),
+            domains: match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER" && d.strength !== "WEAK").map((d) => d.domain),
+            secondaryEvidenceDomains: match.secondaryEvidenceDomains || match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER" && d.strength === "WEAK").map((d) => d.domain),
             domainMatches: match.domainMatches,
             careerFit: match.careerFit,
 

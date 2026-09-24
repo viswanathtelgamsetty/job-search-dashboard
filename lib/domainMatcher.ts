@@ -215,6 +215,7 @@ export function extractDomainMatches(
         matched: true,
         evidence: `Role is administrative / non-technical: "${cleanTitle}"`,
         source: "title",
+        strength: "STRONG",
       },
     ];
   }
@@ -223,7 +224,7 @@ export function extractDomainMatches(
   const isQARole = /\b(?:qa\s+engineer|quality\s+assurance|test\s+engineer|sdet|test\s+automation)\b/i.test(cleanTitle);
 
   // =========================================================================
-  // Pass 1: Title-Based Domain Matching (Authoritative Source: "title")
+  // Pass 1: Title-Based Domain Matching (Authoritative Source: "title", Strength: "STRONG")
   // =========================================================================
   for (const rule of DOMAIN_RULES) {
     if (rule.titlePattern.test(cleanTitle)) {
@@ -235,13 +236,14 @@ export function extractDomainMatches(
         matched: true,
         evidence: cleanTitle,
         source: "title",
+        strength: "STRONG",
       });
       assignedDomains.add(rule.domain);
     }
   }
 
   // =========================================================================
-  // Pass 2: Contextual Description Matching (Source: "description")
+  // Pass 2: Contextual Description Matching (Source: "description", Strength: "STRONG")
   // =========================================================================
   for (const rule of DOMAIN_RULES) {
     if (assignedDomains.has(rule.domain)) continue;
@@ -265,6 +267,7 @@ export function extractDomainMatches(
           matched: true,
           evidence: snippet,
           source: "description",
+          strength: "STRONG",
         });
         assignedDomains.add(rule.domain);
       }
@@ -272,8 +275,8 @@ export function extractDomainMatches(
   }
 
   // =========================================================================
-  // Pass 3: Verified Skills / Tags Matching (Source: "skills")
-  // Only assign if the skill directly specifies the domain itself.
+  // Pass 3: Verified Skills / Tags Matching (Source: "skills", Strength: "MODERATE" or "WEAK")
+  // Generic technology tags (Docker, Python, Kubernetes, React, Commerce) without title/desc support are WEAK.
   // =========================================================================
   for (const rule of DOMAIN_RULES) {
     if (assignedDomains.has(rule.domain) || !rule.skillPattern) continue;
@@ -284,11 +287,15 @@ export function extractDomainMatches(
 
     const matchedSkill = skills.find((s) => rule.skillPattern!.test(s.trim()));
     if (matchedSkill) {
+      const isExplicitDomain = /^(?:frontend\s+architecture|digital\s+experience|headless\s+cms|solutions?\s+architecture|technical\s+architecture|enterprise\s+integration|site\s+reliability\s+engineering)$/i.test(matchedSkill.trim());
+      const strength = isExplicitDomain ? "MODERATE" : "WEAK";
+
       matches.push({
         domain: rule.domain,
         matched: true,
         evidence: `Source skill tag: "${matchedSkill}"`,
         source: "skills",
+        strength,
       });
       assignedDomains.add(rule.domain);
     }
@@ -301,10 +308,32 @@ export function extractDomainMatches(
       matched: true,
       evidence: `Role does not explicitly mention target technical domains`,
       source: "title",
+      strength: "STRONG",
     });
   }
 
   return matches;
+}
+
+/**
+ * Returns primary domains (STRONG or MODERATE evidence from title, description, or explicit domain skills).
+ * Excludes WEAK domains (generic technology tags like Docker, Python, Kubernetes, Commerce tag alone).
+ */
+export function getPrimaryDomains(details: DomainMatchDetail[]): CareerDomain[] {
+  const primary = details
+    .filter((d) => d.matched && d.domain !== "OTHER" && d.strength !== "WEAK")
+    .map((d) => d.domain);
+
+  return primary.length > 0 ? primary : ["OTHER"];
+}
+
+/**
+ * Returns secondary domains (WEAK evidence from generic provider skill tags alone).
+ */
+export function getSecondaryDomains(details: DomainMatchDetail[]): CareerDomain[] {
+  return details
+    .filter((d) => d.matched && d.domain !== "OTHER" && d.strength === "WEAK")
+    .map((d) => d.domain);
 }
 
 export function formatDomainName(domain: CareerDomain): string {

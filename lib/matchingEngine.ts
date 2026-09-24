@@ -72,8 +72,13 @@ export function evaluateJobMatch(
     job.skills || []
   );
 
+  // Primary domain evidence (STRONG or MODERATE) - WEAK domains are separated
   const matchedDomainKeys: CareerDomain[] = domainMatches
-    .filter((d) => d.matched && d.domain !== "OTHER")
+    .filter((d) => d.matched && d.domain !== "OTHER" && d.strength !== "WEAK")
+    .map((d) => d.domain);
+
+  const secondaryEvidenceDomains: CareerDomain[] = domainMatches
+    .filter((d) => d.matched && d.domain !== "OTHER" && d.strength === "WEAK")
     .map((d) => d.domain);
 
   const primaryTargetDomains: CareerDomain[] = [
@@ -109,7 +114,7 @@ export function evaluateJobMatch(
     matched: matchedPrimaryDomains.length > 0,
     strength: domainFitStrength,
     evidence: domainMatches
-      .filter((d) => d.matched && d.domain !== "OTHER")
+      .filter((d) => d.matched && d.domain !== "OTHER" && d.strength !== "WEAK")
       .map((d) => `${formatDomainName(d.domain)}: "${d.evidence}"`),
     reason:
       matchedPrimaryDomains.length > 0
@@ -633,6 +638,7 @@ export function evaluateJobMatch(
     cautions: potentialGaps.slice(0, 4),
     potentialGaps: potentialGaps.slice(0, 4),
     domainMatches,
+    secondaryEvidenceDomains,
     dimensions,
     breakdown: {
       roleMatch: legacyRoleMatch,

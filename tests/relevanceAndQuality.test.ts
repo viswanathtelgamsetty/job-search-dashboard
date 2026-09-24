@@ -8,7 +8,7 @@ import { parseAndNormalizeSalary } from "../lib/salaryParser.ts";
 import { extractTravelDetails } from "../lib/travelExtractor.ts";
 import { evaluateJobMatch } from "../lib/matchingEngine.ts";
 import { extractActualJobTechnologies, matchTargetTechnologies } from "../lib/technologyMatcher.ts";
-import { extractDomainMatches } from "../lib/domainMatcher.ts";
+import { extractDomainMatches, getPrimaryDomains, getSecondaryDomains } from "../lib/domainMatcher.ts";
 import { defaultSearchProfile } from "../config/defaultProfile.ts";
 
 // 1. Role Family Classification Tests
@@ -585,6 +585,83 @@ test("REGRESSION: Technical Architect + MuleSoft -> TECHNICAL_ARCHITECTURE + ENT
 
   assert.ok(domains.some((d) => d.domain === "TECHNICAL_ARCHITECTURE" && d.matched), "Must match TECHNICAL_ARCHITECTURE");
   assert.ok(domains.some((d) => d.domain === "ENTERPRISE_INTEGRATION" && d.matched), "Must match ENTERPRISE_INTEGRATION");
+});
+
+// 12. Phase 3.2.2 — Domain Evidence Precedence Regression Tests
+test("REGRESSION Phase 3.2.2: Docker alone does not create DEVOPS", () => {
+  const details = extractDomainMatches("Backend Engineer", "Build backend microservices in Go.", ["Docker"]);
+  const primary = getPrimaryDomains(details);
+  assert.strictEqual(primary.includes("DEVOPS"), false, "Docker tag must not create DEVOPS in primary domains");
+  const secondary = getSecondaryDomains(details);
+  assert.ok(secondary.includes("DEVOPS"), "DEVOPS should be captured as secondary/weak domain");
+});
+
+test("REGRESSION Phase 3.2.2: Python alone does not create DATA_AI", () => {
+  const details = extractDomainMatches("Backend Engineer", "Build backend REST APIs with databases.", ["Python"]);
+  const primary = getPrimaryDomains(details);
+  assert.strictEqual(primary.includes("DATA_AI"), false, "Python tag must not create DATA_AI in primary domains");
+  const secondary = getSecondaryDomains(details);
+  assert.ok(secondary.includes("DATA_AI"), "DATA_AI should be captured as secondary/weak domain");
+});
+
+test("REGRESSION Phase 3.2.2: Kubernetes alone does not create SRE", () => {
+  const details = extractDomainMatches("Backend Engineer", "Maintain cloud microservices and deployment.", ["Kubernetes"]);
+  const primary = getPrimaryDomains(details);
+  assert.strictEqual(primary.includes("SRE"), false, "Kubernetes tag must not create SRE in primary domains");
+});
+
+test("REGRESSION Phase 3.2.2: Commerce skill tag alone does not create COMMERCE", () => {
+  const details = extractDomainMatches("Web Developer", "Working on internal portal and intranet systems.", ["Commerce"]);
+  const primary = getPrimaryDomains(details);
+  assert.strictEqual(primary.includes("COMMERCE"), false, "Commerce tag alone must not create COMMERCE in primary domains");
+  const secondary = getSecondaryDomains(details);
+  assert.ok(secondary.includes("COMMERCE"), "Commerce tag alone should be secondary/weak");
+});
+
+test("REGRESSION Phase 3.2.2: React skill tag alone does not create FRONTEND", () => {
+  const details = extractDomainMatches("Full Stack Developer", "Building enterprise systems with Java and databases.", ["React"]);
+  const primary = getPrimaryDomains(details);
+  assert.strictEqual(primary.includes("FRONTEND"), false, "React tag alone without frontend responsibility must not create FRONTEND in primary domains");
+  const secondary = getSecondaryDomains(details);
+  assert.ok(secondary.includes("FRONTEND"), "React tag alone should be secondary/weak");
+});
+
+test("REGRESSION Phase 3.2.2: Shopify + storefront description DOES create COMMERCE", () => {
+  const details = extractDomainMatches(
+    "Web Developer",
+    "Building custom Shopify storefronts, checkout workflows, and headless commerce integrations.",
+    ["Shopify"]
+  );
+  const primary = getPrimaryDomains(details);
+  assert.ok(primary.includes("COMMERCE"), "Shopify + storefront description must create COMMERCE in primary domains");
+});
+
+test("REGRESSION Phase 3.2.2: React + frontend responsibility DOES create FRONTEND", () => {
+  const details = extractDomainMatches(
+    "Software Engineer",
+    "Responsible for frontend architecture, user interfaces, client-side performance, and React web applications.",
+    ["React"]
+  );
+  const primary = getPrimaryDomains(details);
+  assert.ok(primary.includes("FRONTEND"), "React + frontend responsibility must create FRONTEND in primary domains");
+});
+
+test("REGRESSION Phase 3.2.2: Data Scientist title DOES create DATA_AI", () => {
+  const details = extractDomainMatches("Senior Data Scientist", "Analyze data and train predictive algorithms.", []);
+  const primary = getPrimaryDomains(details);
+  assert.ok(primary.includes("DATA_AI"), "Data Scientist title must create DATA_AI in primary domains");
+});
+
+test("REGRESSION Phase 3.2.2: SRE title DOES create SRE", () => {
+  const details = extractDomainMatches("Site Reliability Engineer", "Maintain uptime, SLOs, and observability.", []);
+  const primary = getPrimaryDomains(details);
+  assert.ok(primary.includes("SRE"), "SRE title must create SRE in primary domains");
+});
+
+test("REGRESSION Phase 3.2.2: Solutions Architect title DOES create SOLUTIONS_ARCHITECTURE", () => {
+  const details = extractDomainMatches("Solutions Architect", "Design technical solutions for enterprise customers.", []);
+  const primary = getPrimaryDomains(details);
+  assert.ok(primary.includes("SOLUTIONS_ARCHITECTURE"), "Solutions Architect title must create SOLUTIONS_ARCHITECTURE in primary domains");
 });
 
 
