@@ -261,6 +261,8 @@ export interface DomainMatchDetail {
 
 export type FitStrength = "STRONG" | "MODERATE" | "WEAK" | "NONE";
 
+export type ApplicationRecommendation = "APPLY_NOW" | "REVIEW" | "WATCH" | "SKIP";
+
 export interface DimensionFit {
   matched: boolean;
   strength: FitStrength;
@@ -272,8 +274,11 @@ export interface CareerFitDimensions {
   roleFit: DimensionFit;
   technologyFit: DimensionFit;
   domainFit: DimensionFit;
+  architectureFit: DimensionFit;
+  clientConsultingFit: DimensionFit;
   seniorityFit: DimensionFit;
   locationFit: DimensionFit;
+  internationalFit: DimensionFit;
   remoteFit: DimensionFit;
   travelFit: DimensionFit;
   clientFacingFit: DimensionFit;
@@ -309,6 +314,14 @@ export interface JobMatchDetails {
   domainMatches: DomainMatchDetail[];
   secondaryEvidenceDomains?: CareerDomain[];
   dimensions: CareerFitDimensions;
+  applicationRecommendation?: ApplicationRecommendation;
+  technologyFit?: DimensionFit;
+  domainFit?: DimensionFit;
+  architectureFit?: DimensionFit;
+  clientConsultingFit?: DimensionFit;
+  seniorityFit?: DimensionFit;
+  locationFit?: DimensionFit;
+  internationalFit?: DimensionFit;
   missingOrNeutral?: string[];
   breakdown: {
     roleMatch: MatchCriterion;
@@ -407,6 +420,7 @@ export interface Job {
   market?: MarketRegion;
   regions?: string[];
   emeaCountry?: EmeaCountry;
+  customerRegion?: string;
   opportunityType?: OpportunityType;
   opportunityTypes?: OpportunityType[];
   internationalExposure?: InternationalExposureDetail;
@@ -418,6 +432,16 @@ export interface Job {
   isIndiaToEmeaReason?: string;
   travelType?: TravelType;
   travelEvidence?: string;
+
+  // Phase 7.2: Discovery Quality & Recommendations
+  applicationRecommendation?: ApplicationRecommendation;
+  technologyFit?: DimensionFit;
+  domainFit?: DimensionFit;
+  architectureFit?: DimensionFit;
+  clientConsultingFit?: DimensionFit;
+  seniorityFit?: DimensionFit;
+  locationFit?: DimensionFit;
+  internationalFit?: DimensionFit;
 
   // Application tracker details
   notes?: string;

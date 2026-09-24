@@ -1,4 +1,5 @@
 import type {
+  ApplicationRecommendation,
   CareerDomain,
   CareerFitDimensions,
   DimensionFit,
@@ -6,13 +7,18 @@ import type {
   FitStrength,
   JobMatchDetails,
   MatchCriterion,
+  MarketRegion,
+  NormalizedLocation,
+  OpportunityType,
   RelevanceBucket,
   RemoteType,
   RoleFamily,
+  RoleTier,
   SearchProfile,
   SeniorityLevel,
   TechnologyMatchDetail,
   TravelType,
+  WorkAuthorization,
 } from "@/types";
 import { matchesSalaryRequirement } from "./salaryParser.ts";
 import { classifyLocation, checkIndiaEligibility } from "./locationClassifier.ts";
@@ -27,6 +33,9 @@ import {
   formatRoleFamily,
   formatRoleTier,
 } from "./roleClassifier.ts";
+import { classifyMarketAndEmeaCountry } from "./marketClassifier.ts";
+import { classifyOpportunityTypes } from "./opportunityType.ts";
+import { classifyWorkAuthorization } from "./workAuthorizationClassifier.ts";
 import { detectSeniority } from "./seniorityDetector.ts";
 import { extractDomainMatches, formatDomainName } from "./domainMatcher.ts";
 
@@ -49,6 +58,11 @@ export interface JobForEvaluation {
   description?: string;
   postedAt?: string;
   discoveredAt?: string;
+  market?: MarketRegion;
+  opportunityType?: OpportunityType;
+  workAuthorization?: WorkAuthorization;
+  isIndiaToEmea?: boolean;
+  customerRegion?: string;
 }
 
 /**
@@ -376,7 +390,7 @@ export function evaluateJobMatch(
   };
 
   // =========================================================================
-  // 9. Career Fit Classification (Strict Phase 7.1 Rules)
+  // 9. Career Fit Classification (Strict Phase 7.2 Rules)
   // =========================================================================
   const isIndiaFriendly = locationFit.strength === "STRONG" || locationFit.strength === "MODERATE";
   const hasSeniority = seniorityFit.strength === "STRONG" || seniorityFit.strength === "MODERATE";
@@ -409,8 +423,7 @@ export function evaluateJobMatch(
       ["TECHNICAL_ARCHITECTURE", "SOLUTIONS_ARCHITECTURE", "ENTERPRISE_INTEGRATION"].includes(d)
     );
 
-  // Client-Facing Architecture / Consulting Evidence (Section 4 & 5)
-  // Must require explicit customer/client engagement, not just the word "Solutions" in title
+  // Client-Facing Architecture / Consulting Evidence
   const hasClientConsultingEvidence =
     /\b(?:client[- ]facing|customer[- ]facing|client\s+consulting|customer\s+architecture|technical\s+consulting|professional\s+services|solution\s+consulting|external\s+stakeholder|presales\s+architecture)\b/i.test(
       `${job.title} ${job.description || ""}`
@@ -424,12 +437,57 @@ export function evaluateJobMatch(
         matchedPrimaryDomains.includes("CLIENT_CONSULTING") ||
         matchedPrimaryDomains.includes("PROFESSIONAL_SERVICES")));
 
+  // Phase 7.2 Section 1: Explicit Tier 4 Architecture Evidence
+  // Tier 4 roles must NOT be RELEVANT unless there is explicit evidence of:
+  // - architecture ownership
+  // - frontend architecture
+  // - technical leadership
+  // - client-facing architecture
+  // - solutions architecture
+  const hasExplicitTier4ArchEvidence =
+    /\b(architecture\s+ownership|frontend\s+architecture|front[- ]end\s+architecture|technical\s+leadership|client[- ]facing\s+architecture|solutions?\s+architecture)\b/i.test(
+      `${job.title} ${job.description || ""}`
+    );
+
+  // Phase 7.2 Section 2: Career Direction Conflicts (Exclude from HIGH_RELEVANCE)
+  // Mobile Architect with no frontend/web evidence
+  // Data & AI Architect with no frontend/integration evidence
+  // Observability Architect with no relevant target domain
+  // Cloud Architect with no relevant frontend/enterprise integration evidence
+  const titleLower = job.title.toLowerCase();
+
+  const isMobileArchitectConflict =
+    /\bmobile\b.*\barchitect\b/i.test(titleLower) &&
+    !primaryTechNames.some((t) => ["React", "Next.js", "Angular", "TypeScript", "JavaScript"].includes(t)) &&
+    !/\b(react\s+native|web|frontend|front[- ]end)\b/i.test(`${job.title} ${job.description || ""}`);
+
+  const isDataAiArchitectConflict =
+    /\b(data|ai|machine\s+learning|ml|analytics)\b.*\barchitect\b/i.test(titleLower) &&
+    !hasRealFrontendEvidence &&
+    !matchedPrimaryDomains.includes("ENTERPRISE_INTEGRATION") &&
+    !primaryTechNames.some((t) => ["GraphQL", "REST APIs", "Node.js"].includes(t));
+
+  const isObservabilityArchitectConflict =
+    /\b(observability|monitoring|sre|telemetry)\b.*\barchitect\b/i.test(titleLower) &&
+    matchedPrimaryDomains.length === 0;
+
+  const isCloudArchitectConflict =
+    /\bcloud\b.*\barchitect\b/i.test(titleLower) &&
+    !hasRealFrontendEvidence &&
+    !matchedPrimaryDomains.includes("ENTERPRISE_INTEGRATION") &&
+    !primaryTechNames.some((t) => ["Node.js", "TypeScript", "REST APIs", "GraphQL"].includes(t));
+
+  const hasCareerDirectionConflict =
+    isMobileArchitectConflict ||
+    isDataAiArchitectConflict ||
+    isObservabilityArchitectConflict ||
+    isCloudArchitectConflict;
+
   let relevanceBucket: RelevanceBucket;
 
   if (roleTier === "TIER_5" || isLowPriorityOrExcluded) {
     relevanceBucket = "LOW_RELEVANCE";
   } else if (
-    // Section 11: Data/AI roles (Data Scientist, ML, AI Engineer) are LOW_RELEVANCE unless Tier 1 architect
     (roleClassification.primary === "DATA_AI" ||
       /\b(data\s+scientist|machine\s+learning|ai\s+engineer|nlp)\b/i.test(job.title)) &&
     roleTier !== "TIER_1"
@@ -441,23 +499,29 @@ export function evaluateJobMatch(
     seniorityResult.level !== "ENTRY" &&
     seniorityResult.level !== "MID" &&
     roleTier === "TIER_1" &&
+    !hasCareerDirectionConflict &&
     (
+      // 1. Strong primary technology match
+      hasStrongTech ||
+      // 2. Strong target domain match with primary tech or frontend or client consulting
+      (hasStrongPrimaryDomain && (hasPrimaryTech || hasRealFrontendEvidence || (hasRealArchitectureEvidence && hasClientConsultingEvidence))) ||
+      // 3. Strong architecture + client consulting evidence
+      (hasRealArchitectureEvidence && hasClientConsultingEvidence && (hasPrimaryTech || matchedPrimaryDomains.includes("ENTERPRISE_INTEGRATION"))) ||
       // A. Real Frontend Architect or Senior Frontend Engineer with real frontend evidence & primary tech
       ((roleClassification.primary === "FRONTEND_ARCHITECT" || roleClassification.primary === "SENIOR_FRONTEND_ENGINEER") &&
-        hasRealFrontendEvidence &&
-        hasPrimaryTech) ||
-      // B. Solutions Architect with customer consulting evidence + architecture or primary tech
+        (hasPrimaryTech || hasRealFrontendEvidence)) ||
+      // B. Solutions Architect with customer consulting evidence + architecture or primary tech or integration
       (roleClassification.primary === "SOLUTIONS_ARCHITECT" &&
         hasClientConsultingEvidence &&
-        (hasRealArchitectureEvidence || hasPrimaryTech)) ||
-      // C. Commerce or CMS Architect with primary tech or strong primary domain
+        (hasRealArchitectureEvidence || hasPrimaryTech || matchedPrimaryDomains.includes("ENTERPRISE_INTEGRATION"))) ||
+      // C. Commerce or CMS Architect with primary tech or target domain
       ((roleClassification.primary === "COMMERCE" || roleClassification.primary === "CMS_DIGITAL_EXPERIENCE") &&
-        (hasPrimaryTech || hasStrongPrimaryDomain)) ||
+        (hasPrimaryTech || matchedPrimaryDomains.length >= 1)) ||
       // D. Technical Architect with architecture evidence and target tech or integration
       (roleClassification.primary === "TECHNICAL_ARCHITECT" &&
         hasRealArchitectureEvidence &&
-        (hasPrimaryTech || matchedPrimaryDomains.length >= 1)) ||
-      // E. Deep primary domain specialist with strong primary tech (e.g. Next.js + Contentful + Commerce)
+        (hasPrimaryTech || matchedPrimaryDomains.includes("ENTERPRISE_INTEGRATION") || matchedPrimaryDomains.includes("TECHNICAL_ARCHITECTURE"))) ||
+      // E. Deep primary domain specialist with strong primary tech
       (hasStrongPrimaryDomain && hasStrongTech && hasRealFrontendEvidence)
     )
   ) {
@@ -475,15 +539,13 @@ export function evaluateJobMatch(
       (roleTier === "TIER_2" && (hasPrimaryTech || matchedPrimaryDomains.length >= 1 || hasClientConsultingEvidence)) ||
       // Tier 3 roles ONLY if they have real frontend evidence or real architecture evidence
       (roleTier === "TIER_3" && (hasRealFrontendEvidence || hasRealArchitectureEvidence)) ||
-      // Tier 4 roles ONLY if strong architecture + frontend evidence exists (otherwise Tier 4 is POSSIBLE/LOW)
-      (roleTier === "TIER_4" && hasRealFrontendEvidence && hasRealArchitectureEvidence)
+      // Tier 4 roles ONLY if explicit architecture evidence exists (Phase 7.2 Section 1)
+      (roleTier === "TIER_4" && hasExplicitTier4ArchEvidence)
     )
   ) {
     relevanceBucket = "RELEVANT";
-  } else if (
-    roleTier === "TIER_4"
-  ) {
-    // Section 11: Tier 4 roles (DevOps, SRE, Cloud Ops, Rust, Backend)
+  } else if (roleTier === "TIER_4") {
+    // Phase 7.2 Section 1: Tier 4 roles without explicit architecture evidence
     // Only POSSIBLE if architecture or client consulting overlap exists; otherwise LOW_RELEVANCE
     if (
       hasRealArchitectureEvidence ||
@@ -507,17 +569,6 @@ export function evaluateJobMatch(
 
   // =========================================================================
   // 10. Transparent, Deterministic Priority Scoring (Section 16)
-  // Deterministic Ranking Order:
-  // 1. Career Fit
-  // 2. Target Role Tier
-  // 3. Seniority
-  // 4. Primary Technology Match
-  // 5. Primary Domain Match
-  // 6. Client Facing
-  // 7. India Eligibility
-  // 8. International Customer Exposure
-  // 9. International Travel
-  // 10. Freshness
   // =========================================================================
   let score = 20;
   if (relevanceBucket === "HIGH_RELEVANCE") score = 85;
@@ -622,6 +673,17 @@ export function evaluateJobMatch(
   // Meaningful Gaps (Section 14)
   const potentialGaps: string[] = [];
 
+  // Direction conflict gaps
+  if (isMobileArchitectConflict) {
+    potentialGaps.push("! Mobile architecture focus without web/frontend integration evidence");
+  } else if (isDataAiArchitectConflict) {
+    potentialGaps.push("! Data & AI architecture focus without frontend or enterprise integration evidence");
+  } else if (isObservabilityArchitectConflict) {
+    potentialGaps.push("! Observability/SRE architecture focus without target domain alignment");
+  } else if (isCloudArchitectConflict) {
+    potentialGaps.push("! Cloud infrastructure architecture without frontend or enterprise integration focus");
+  }
+
   if (/\b(devops|sre|infrastructure)\b/i.test(job.title)) {
     potentialGaps.push("! Primary focus is DevOps rather than frontend architecture");
   } else if (/\b(cloud\s+operations|cloud\s+ops)\b/i.test(job.title)) {
@@ -655,14 +717,183 @@ export function evaluateJobMatch(
   }
 
   // =========================================================================
-  // 12. Return JobMatchDetails with all Career Fit Dimensions
+  // 12. Fit Dimensions (Phase 7.2 Section 3)
+  // technologyFit, domainFit, architectureFit, clientConsultingFit,
+  // seniorityFit, locationFit, internationalFit
+  // =========================================================================
+
+  // 12.1 architectureFit
+  let architectureStrength: FitStrength = "NONE";
+  const archEvidence: string[] = [];
+  if (
+    /\b(frontend\s+architect|technical\s+architect|solutions\s+architect|commerce\s+architect|enterprise\s+architect|system\s+architect|principal\s+architect)\b/i.test(
+      job.title
+    )
+  ) {
+    architectureStrength = "STRONG";
+    archEvidence.push(`Title matches core target architect role: "${job.title}"`);
+  } else if (hasRealArchitectureEvidence) {
+    architectureStrength = "STRONG";
+    archEvidence.push("Explicit architecture ownership, system design, or technical strategy detected in posting");
+  } else if (
+    matchedPrimaryDomains.some((d) =>
+      ["TECHNICAL_ARCHITECTURE", "SOLUTIONS_ARCHITECTURE", "ENTERPRISE_INTEGRATION"].includes(d)
+    )
+  ) {
+    architectureStrength = "MODERATE";
+    archEvidence.push("Architecture or enterprise integration domain match");
+  } else if (/\b(architect|architecture|design\s+systems?)\b/i.test(fullTextLower)) {
+    architectureStrength = "WEAK";
+    archEvidence.push("Secondary architecture mentions in text");
+  }
+
+  const architectureFit: DimensionFit = {
+    matched: architectureStrength === "STRONG" || architectureStrength === "MODERATE",
+    strength: architectureStrength,
+    evidence: archEvidence,
+    reason:
+      architectureStrength === "STRONG"
+        ? "Explicit architecture ownership, system design, or lead architect scope"
+        : architectureStrength === "MODERATE"
+        ? "Technical design or enterprise integration architecture scope"
+        : architectureStrength === "WEAK"
+        ? "Secondary architecture mentions"
+        : "No explicit architecture or system design scope",
+  };
+
+  // 12.2 clientConsultingFit
+  let clientStrength: FitStrength = "NONE";
+  const clientEvidence: string[] = [];
+  if (hasClientConsultingEvidence) {
+    clientStrength = "STRONG";
+    clientEvidence.push("Explicit client-facing architecture, consulting, or enterprise customer engagement");
+  } else if (isClientFacing) {
+    clientStrength = "MODERATE";
+    clientEvidence.push("Client-facing, customer interaction, or stakeholder consulting detected");
+  }
+
+  const clientConsultingFit: DimensionFit = {
+    matched: clientStrength === "STRONG" || clientStrength === "MODERATE",
+    strength: clientStrength,
+    evidence: clientEvidence,
+    reason:
+      clientStrength === "STRONG"
+        ? "Customer-facing architecture, technical consulting, or enterprise client delivery"
+        : clientStrength === "MODERATE"
+        ? "Client or external stakeholder interaction"
+        : "Internal engineering or platform focus",
+  };
+
+  // 12.3 internationalFit
+  const market =
+    job.market || classifyMarketAndEmeaCountry(job.location, job.description).market;
+  const oppTypes = job.opportunityType
+    ? [job.opportunityType]
+    : classifyOpportunityTypes({
+        market,
+        remoteType: job.remoteType,
+        location: job.location,
+        isIndiaEligible: indiaCheck.isIndiaEligible,
+        travel: { type: tType, percentage: tPercentage, evidence: tEvidence || "", destinations: job.travelDestinations || [] },
+        description: job.description,
+      });
+
+  const isIndiaToEmeaRole =
+    job.isIndiaToEmea ??
+    (typeof oppTypes === "object" && oppTypes !== null && "isIndiaToEmea" in oppTypes
+      ? (oppTypes as { isIndiaToEmea?: boolean }).isIndiaToEmea
+      : false);
+
+  const detectedCustomerRegion =
+    job.customerRegion ||
+    (typeof oppTypes === "object" && oppTypes !== null && "customerRegion" in oppTypes
+      ? (oppTypes as { customerRegion?: string }).customerRegion
+      : undefined);
+
+  let intlStrength: FitStrength = "NONE";
+  const intlEvidence: string[] = [];
+  let intlReason = "Domestic or local scope without international exposure";
+
+  if (isIndiaToEmeaRole || detectedCustomerRegion === "EMEA") {
+    intlStrength = "STRONG";
+    intlEvidence.push("India-based role with EMEA customer scope / international exposure");
+    intlReason = "India base with verified EMEA customer scope & engagement";
+  } else if (isIntlTravel) {
+    intlStrength = "STRONG";
+    intlEvidence.push(tEvidence || "Explicit international or client-site travel");
+    intlReason = "International or client-site travel requirement";
+  } else if (market === "GLOBAL_REMOTE" && indiaCheck.isIndiaEligible) {
+    intlStrength = "STRONG";
+    intlEvidence.push("Worldwide / Global Remote with confirmed India hiring");
+    intlReason = "Global remote opportunity hiring directly from India";
+  } else if (market === "MULTI_REGION_REMOTE" || market === "GLOBAL_REMOTE") {
+    intlStrength = "MODERATE";
+    intlEvidence.push(`Multi-region / Global Remote (${job.location})`);
+    intlReason = "Multi-region remote opportunity (India eligibility requires verification)";
+  } else if (market === "EMEA") {
+    if (indiaCheck.isIndiaEligible) {
+      intlStrength = "STRONG";
+      intlEvidence.push("EMEA market opportunity with India remote eligibility");
+      intlReason = "EMEA opportunity accessible from India";
+    } else {
+      intlStrength = "MODERATE";
+      intlEvidence.push(`EMEA local opportunity (${job.location})`);
+      intlReason = "EMEA local position (India eligibility: NO or UNKNOWN)";
+    }
+  } else if (travelStrength === "MODERATE") {
+    intlStrength = "MODERATE";
+    intlEvidence.push("International team collaboration");
+    intlReason = "Cross-border global team collaboration";
+  }
+
+  const internationalFit: DimensionFit = {
+    matched: intlStrength === "STRONG" || intlStrength === "MODERATE",
+    strength: intlStrength,
+    evidence: intlEvidence,
+    reason: intlReason,
+  };
+
+  // =========================================================================
+  // 13. Application Recommendation (Phase 7.2 Section 4)
+  // APPLY_NOW | REVIEW | WATCH | SKIP
+  // =========================================================================
+  const effectiveWorkAuth =
+    job.workAuthorization ||
+    classifyWorkAuthorization(job.location, job.description, indiaCheck.isIndiaEligible).authorization;
+
+  const effectiveOppType =
+    job.opportunityType ||
+    (typeof oppTypes === "object" && oppTypes !== null && "primary" in oppTypes
+      ? (oppTypes as { primary: OpportunityType }).primary
+      : undefined);
+
+  const applicationRecommendation = calculateApplicationRecommendation({
+    relevanceBucket,
+    roleTier,
+    seniorityLevel: seniorityResult.level,
+    seniorityStrength,
+    isIndiaEligible: indiaCheck.isIndiaEligible,
+    workAuthorization: effectiveWorkAuth,
+    hasCareerDirectionConflict,
+    primaryTechCount: primaryMatched.length,
+    salaryDisclosed: job.salaryDisclosed,
+    market,
+    opportunityType: effectiveOppType,
+    normLoc,
+  });
+
+  // =========================================================================
+  // 14. Return JobMatchDetails with all Career Fit Dimensions
   // =========================================================================
   const dimensions: CareerFitDimensions = {
     roleFit,
     technologyFit,
     domainFit,
+    architectureFit,
+    clientConsultingFit,
     seniorityFit,
     locationFit,
+    internationalFit,
     remoteFit,
     travelFit,
     clientFacingFit,
@@ -738,6 +969,14 @@ export function evaluateJobMatch(
   return {
     relevanceBucket,
     careerFit: relevanceBucket,
+    applicationRecommendation,
+    technologyFit,
+    domainFit,
+    architectureFit,
+    clientConsultingFit,
+    seniorityFit,
+    locationFit,
+    internationalFit,
     reasons: whyThisFits.slice(0, 7),
     whyThisFits: whyThisFits.slice(0, 7),
     cautions: potentialGaps.slice(0, 4),
@@ -761,4 +1000,105 @@ export function evaluateJobMatch(
     },
     overallScore: score,
   };
+}
+
+/**
+ * Phase 7.2 Section 4: Deterministic Application Recommendation
+ * APPLY_NOW | REVIEW | WATCH | SKIP
+ */
+export function calculateApplicationRecommendation(params: {
+  relevanceBucket: RelevanceBucket;
+  roleTier: RoleTier;
+  seniorityLevel: SeniorityLevel;
+  seniorityStrength: FitStrength;
+  isIndiaEligible: boolean;
+  workAuthorization?: WorkAuthorization;
+  hasCareerDirectionConflict: boolean;
+  primaryTechCount: number;
+  salaryDisclosed?: boolean;
+  market?: MarketRegion;
+  opportunityType?: OpportunityType;
+  normLoc?: NormalizedLocation;
+}): ApplicationRecommendation {
+  const {
+    relevanceBucket,
+    roleTier,
+    seniorityLevel,
+    isIndiaEligible,
+    workAuthorization,
+    hasCareerDirectionConflict,
+    primaryTechCount,
+    market,
+    opportunityType,
+  } = params;
+
+  // 1. SKIP Check:
+  // - LOW_RELEVANCE
+  // - Tier 5 role (unrelated domain)
+  // - Entry level seniority
+  // - Major career mismatch
+  // IMPORTANT: Do not use salary unknown as a reason to SKIP!
+  if (
+    relevanceBucket === "LOW_RELEVANCE" ||
+    roleTier === "TIER_5" ||
+    seniorityLevel === "ENTRY"
+  ) {
+    return "SKIP";
+  }
+
+  const isWorkAuthBlocked =
+    workAuthorization === "LOCAL_WORK_AUTH_REQUIRED" ||
+    workAuthorization === "SPONSORSHIP_NOT_AVAILABLE" ||
+    workAuthorization === "REMOTE_LOCATION_RESTRICTED";
+
+  // 2. WATCH Check:
+  // - POSSIBLE roles
+  // - Adjacent roles
+  // - EMEA / global opportunity with visa restriction
+  if (relevanceBucket === "POSSIBLE") {
+    return "WATCH";
+  }
+
+  // If EMEA local or non-India and work auth is strictly local work auth required,
+  // do not pretend it is directly actionable from India -> WATCH
+  if (market === "EMEA" && !isIndiaEligible && isWorkAuthBlocked) {
+    return "WATCH";
+  }
+
+  // 3. APPLY_NOW Check:
+  // - HIGH_RELEVANCE
+  // - target seniority (Senior+)
+  // - no major eligibility blocker (must be India eligible)
+  // - no major career-direction conflict
+  // - has primary technology match
+  if (
+    relevanceBucket === "HIGH_RELEVANCE" &&
+    (seniorityLevel === "ARCHITECT" ||
+      seniorityLevel === "PRINCIPAL" ||
+      seniorityLevel === "STAFF" ||
+      seniorityLevel === "LEAD" ||
+      seniorityLevel === "SENIOR") &&
+    isIndiaEligible &&
+    !isWorkAuthBlocked &&
+    !hasCareerDirectionConflict &&
+    primaryTechCount > 0
+  ) {
+    return "APPLY_NOW";
+  }
+
+  // 4. REVIEW Check:
+  // - HIGH / RELEVANT with uncertainty:
+  //   - work authorization unknown / unconfirmed
+  //   - technology gap (0 primary tech)
+  //   - location uncertainty
+  //   - compensation unknown
+  //   - or standard RELEVANT role to evaluate
+  if (relevanceBucket === "HIGH_RELEVANCE" || relevanceBucket === "RELEVANT") {
+    if ((market === "EMEA" || opportunityType === "EMEA_LOCAL") && !isIndiaEligible) {
+      return isWorkAuthBlocked ? "WATCH" : "REVIEW";
+    }
+    return "REVIEW";
+  }
+
+  return "WATCH";
 }

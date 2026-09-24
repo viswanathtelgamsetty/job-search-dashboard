@@ -13,6 +13,7 @@ export interface OpportunityTypeResult {
   types: OpportunityType[];
   isIndiaToEmea: boolean;
   isIndiaToEmeaReason?: string;
+  customerRegion?: string;
 }
 
 export function classifyOpportunityTypes(params: {
@@ -158,26 +159,36 @@ export function classifyOpportunityTypes(params: {
     primary = "INDIA_LOCAL";
   }
 
-  // 4. Section 18: India -> EMEA Detection
+  // 4. Section 18: India -> EMEA Detection & Customer Region
   // Prioritize jobs that are based in India / remote India / India-eligible
   // AND have explicit evidence of EMEA customers, European clients, travel to Europe, etc.
   let isIndiaToEmea = false;
   let isIndiaToEmeaReason: string | undefined;
+  let customerRegion: string | undefined;
 
   const isIndiaBase = market === "INDIA" || isIndiaEligible;
   const emeaCustomerRegex =
-    /\b((?:work(?:ing)?\s+(?:directly\s+|closely\s+)?with|support(?:ing)?|partner(?:ing)?\s+with|advise|advising|serve|serving|deliver(?:ing)?\s+to|engag(?:e|ing)\s+with)\s+(?:enterprise\s+)?(?:customers?|clients?)\s+(?:across|in)\s+(?:emea|europe|middle\s+east|uk|germany)|(?:emea|european|middle\s+east)\s+(?:customers?|clients?|client\s+base|customer\s+base)|travel\s+to\s+(?:europe|emea|middle\s+east|uk|germany)|client-facing\s+role\s+across\s+emea|work(?:ing)?\s+(?:directly\s+|closely\s+)?with\s+emea\s+customers|supporting\s+middle\s+east)\b/i;
+    /\b((?:work(?:ing)?|support(?:ing)?|partner(?:ing)?|advise|advising|serve|serving|deliver(?:ing)?|engag(?:e|ing))\s+(?:directly\s+|closely\s+)?(?:with\s+)?(?:enterprise\s+)?(?:customers?|clients?)\s+(?:across|in)\s+(?:emea|europe|middle\s+east|uk|germany)|(?:emea|european|middle\s+east)\s+(?:customers?|clients?|client\s+base|customer\s+base)|travel\s+to\s+(?:(?:customer\s+sites?|client\s+sites?)\s+(?:in|across)\s+)?(?:europe|emea|middle\s+east|uk|germany)|client-facing\s+role\s+across\s+emea|work(?:ing)?\s+(?:directly\s+|closely\s+)?with\s+emea\s+customers|supporting\s+middle\s+east)\b/i;
 
   const emeaCustomerMatch = fullText.match(emeaCustomerRegex);
-  if (isIndiaBase && emeaCustomerMatch) {
-    isIndiaToEmea = true;
-    isIndiaToEmeaReason = `India-based role with verified EMEA customer scope: "${emeaCustomerMatch[0]}"`;
-    if (!types.includes("INDIA_INTERNATIONAL")) {
-      types.push("INDIA_INTERNATIONAL");
+  if (emeaCustomerMatch) {
+    customerRegion = "EMEA";
+    if (isIndiaBase) {
+      isIndiaToEmea = true;
+      isIndiaToEmeaReason = `India-based role with verified EMEA customer scope: "${emeaCustomerMatch[0]}"`;
+      if (!types.includes("INDIA_INTERNATIONAL")) {
+        types.push("INDIA_INTERNATIONAL");
+      }
+      if (!types.includes("INDIA_INTERNATIONAL_CUSTOMERS")) {
+        types.push("INDIA_INTERNATIONAL_CUSTOMERS");
+      }
     }
-    if (!types.includes("INDIA_INTERNATIONAL_CUSTOMERS")) {
-      types.push("INDIA_INTERNATIONAL_CUSTOMERS");
-    }
+  } else if (/\b(?:us|usa|united states|north america|americas)\s+(?:customers?|clients?|stakeholders?)\b/i.test(fullText)) {
+    customerRegion = "NORTH_AMERICA";
+  } else if (/\b(?:apac|asia pacific|australia)\s+(?:customers?|clients?|stakeholders?)\b/i.test(fullText)) {
+    customerRegion = "APAC";
+  } else if (/\b(?:global|worldwide|international)\s+(?:customers?|clients?|stakeholders?)\b/i.test(fullText)) {
+    customerRegion = "GLOBAL";
   }
 
   return {
@@ -185,6 +196,7 @@ export function classifyOpportunityTypes(params: {
     types,
     isIndiaToEmea,
     isIndiaToEmeaReason,
+    customerRegion,
   };
 }
 

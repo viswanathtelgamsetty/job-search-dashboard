@@ -9,18 +9,8 @@ export function classifyWorkAuthorization(
   const desc = (description || "").toLowerCase();
   const combined = `${loc} ${desc}`;
 
-  // 1. Check for explicit sponsorship available
-  const sponsorshipAvailableRegex =
-    /\b(visa\s+sponsorship\s+(?:is\s+)?available|sponsorship\s+available|we\s+sponsor\s+visas?|will\s+sponsor\s+visa|eligible\s+for\s+visa\s+sponsorship|relocation\s+and\s+visa\s+support)\b/i;
-  const sponsorshipMatch = combined.match(sponsorshipAvailableRegex);
-  if (sponsorshipMatch) {
-    return {
-      authorization: "SPONSORSHIP_AVAILABLE",
-      evidence: `Explicit visa sponsorship indicated: "${sponsorshipMatch[0]}"`,
-    };
-  }
-
-  // 2. Check for Local Work Authorization Required (takes precedence over generic 'no sponsorship')
+  // 1. Check for explicit NO sponsorship or local work auth required FIRST
+  // To avoid "no visa sponsorship available" accidentally triggering "sponsorship available"
   const localAuthRegex =
     /\b(must\s+(?:have|hold|possess|be)\s+(?:valid\s+)?[a-z/ -]*(?:work\s+authorization|authorized\s+to\s+work|legal\s+right\s+to\s+work|eligible\s+to\s+work|work\s+permit)|must\s+be\s+authorized\s+to\s+work\s+in|valid\s+[a-z/ -]*(?:work\s+authorization|work\s+permit)|existing\s+right\s+to\s+work|right\s+to\s+work\s+in\s+the\s+(?:uk|us|eu)|valid\s+work\s+permit)\b/i;
   const localAuthMatch = combined.match(localAuthRegex);
@@ -31,14 +21,24 @@ export function classifyWorkAuthorization(
     };
   }
 
-  // 3. Check for explicit sponsorship NOT available
   const sponsorshipNotAvailableRegex =
-    /\b(no\s+visa\s+sponsorship|sponsorship\s+(?:is\s+)?not\s+available|unable\s+to\s+sponsor|not\s+offering\s+sponsorship|cannot\s+sponsor|without\s+need\s+for\s+sponsorship)\b/i;
+    /\b(no\s+visa\s+sponsorship|sponsorship\s+(?:is\s+)?not\s+available|no\s+sponsorship\s+available|unable\s+to\s+sponsor|not\s+offering\s+sponsorship|cannot\s+sponsor|without\s+need\s+for\s+sponsorship)\b/i;
   const noSponsorshipMatch = combined.match(sponsorshipNotAvailableRegex);
   if (noSponsorshipMatch) {
     return {
       authorization: "SPONSORSHIP_NOT_AVAILABLE",
       evidence: `Visa sponsorship not available: "${noSponsorshipMatch[0]}"`,
+    };
+  }
+
+  // 2. Check for explicit sponsorship available
+  const sponsorshipAvailableRegex =
+    /\b(?<!no\s+|not\s+|unable\s+to\s+|cannot\s+)(?:visa\s+sponsorship\s+(?:is\s+)?available|sponsorship\s+available|we\s+sponsor\s+visas?|will\s+sponsor\s+visa|eligible\s+for\s+visa\s+sponsorship|relocation\s+and\s+visa\s+support)\b/i;
+  const sponsorshipMatch = combined.match(sponsorshipAvailableRegex);
+  if (sponsorshipMatch) {
+    return {
+      authorization: "SPONSORSHIP_AVAILABLE",
+      evidence: `Explicit visa sponsorship indicated: "${sponsorshipMatch[0]}"`,
     };
   }
 

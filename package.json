@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test tests/travelClassification.test.ts tests/relevanceAndQuality.test.ts tests/marketRadar.test.ts tests/opportunityPriority.test.ts tests/applicationStore.test.ts tests/applicationIntegrationAudit.test.ts tests/searchAnalytics.test.ts tests/globalEmeaOpportunity.test.ts tests/phase71QualityRanking.test.ts"
+    "test": "node --experimental-strip-types --test tests/travelClassification.test.ts tests/relevanceAndQuality.test.ts tests/marketRadar.test.ts tests/opportunityPriority.test.ts tests/applicationStore.test.ts tests/applicationIntegrationAudit.test.ts tests/searchAnalytics.test.ts tests/globalEmeaOpportunity.test.ts tests/phase71QualityRanking.test.ts tests/phase72QualityCorrection.test.ts"
   },
   "dependencies": {
     "next": "16.3.6",

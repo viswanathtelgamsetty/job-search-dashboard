@@ -125,6 +125,23 @@ export class JobIngestionService {
           );
           const freshness = calculateJobFreshness(raw.postedAt, raw.discoveredAt);
 
+          const fullJobText = `${raw.title} ${raw.location} ${raw.description || ""}`;
+          const marketResult = classifyMarketAndEmeaCountry(raw.location, raw.description);
+          const workAuthResult = classifyWorkAuthorization(raw.location, raw.description, indiaEligibility.isIndiaEligible);
+          const clientFacingResult = classifyClientFacing(raw.description || "", raw.title);
+          const intlExposureResult = classifyInternationalExposure(fullJobText, travel);
+          const oppTypeResult = classifyOpportunityTypes({
+            market: marketResult.market,
+            emeaCountry: marketResult.emeaCountry,
+            remoteType: raw.remoteType,
+            location: raw.location,
+            isIndiaEligible: indiaEligibility.isIndiaEligible,
+            travel,
+            internationalExposure: intlExposureResult,
+            clientFacingDetail: clientFacingResult,
+            text: raw.description,
+          });
+
           const match = evaluateJobMatch(
             {
               title: raw.title,
@@ -143,26 +160,15 @@ export class JobIngestionService {
               travelDestinations: travel.destinations,
               travelEvidence: travel.evidence,
               description: raw.description,
+              market: marketResult.market,
+              opportunityType: oppTypeResult.primary,
+              workAuthorization: workAuthResult.authorization,
+              isIndiaToEmea: oppTypeResult.isIndiaToEmea,
+              customerRegion: oppTypeResult.customerRegion,
             },
             profile
           );
 
-          const fullJobText = `${raw.title} ${raw.location} ${raw.description || ""}`;
-          const marketResult = classifyMarketAndEmeaCountry(raw.location, raw.description);
-          const workAuthResult = classifyWorkAuthorization(raw.location, raw.description, indiaEligibility.isIndiaEligible);
-          const clientFacingResult = classifyClientFacing(raw.description || "", raw.title);
-          const intlExposureResult = classifyInternationalExposure(fullJobText, travel);
-          const oppTypeResult = classifyOpportunityTypes({
-            market: marketResult.market,
-            emeaCountry: marketResult.emeaCountry,
-            remoteType: raw.remoteType,
-            location: raw.location,
-            isIndiaEligible: indiaEligibility.isIndiaEligible,
-            travel,
-            internationalExposure: intlExposureResult,
-            clientFacingDetail: clientFacingResult,
-            text: raw.description,
-          });
           const intlOppResult = evaluateInternationalOpportunity({
             careerFit: match.careerFit || "POSSIBLE",
             market: marketResult.market,
@@ -252,6 +258,7 @@ export class JobIngestionService {
             market: marketResult.market,
             regions: marketResult.regions,
             emeaCountry: marketResult.emeaCountry,
+            customerRegion: oppTypeResult.customerRegion,
             opportunityType: oppTypeResult.primary,
             opportunityTypes: oppTypeResult.types,
             internationalExposure: intlExposureResult,
@@ -263,6 +270,16 @@ export class JobIngestionService {
             isIndiaToEmeaReason: oppTypeResult.isIndiaToEmeaReason,
             travelType: travel.travelCategory || travel.type,
             travelEvidence: travel.evidence,
+
+            // Phase 7.2: Discovery Quality & Recommendations
+            applicationRecommendation: match.applicationRecommendation,
+            technologyFit: match.technologyFit,
+            domainFit: match.domainFit,
+            architectureFit: match.architectureFit,
+            clientConsultingFit: match.clientConsultingFit,
+            seniorityFit: match.seniorityFit,
+            locationFit: match.locationFit,
+            internationalFit: match.internationalFit,
 
             // Raw source auditing (Requirement 7)
             sourceTitle: raw.sourceTitle || raw.title,
