@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       totalDiscovered: result.totalIngested,
       newJobsCount: result.newJobs.length,
       jobs: result.allJobs,
+      providers: result.providers,
       timestamp: new Date().toISOString(),
     });
   } catch (err: unknown) {

@@ -26,6 +26,12 @@ export class GreenhouseCareerProvider implements JobProvider {
     { token: "automattic", name: "Automattic", industry: "Digital Publishing & Experience" },
   ];
 
+  getBoardsQueried(): string[] {
+    return process.env.GREENHOUSE_BOARD_TOKENS
+      ? process.env.GREENHOUSE_BOARD_TOKENS.split(",").map((t) => t.trim())
+      : this.defaultBoards.map((b) => b.token);
+  }
+
   async searchJobs(_criteria: SearchCriteria): Promise<DiscoveredJobRaw[]> {
     void _criteria;
     const results: DiscoveredJobRaw[] = [];

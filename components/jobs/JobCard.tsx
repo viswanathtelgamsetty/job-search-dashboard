@@ -89,6 +89,18 @@ export function JobCard({
                 ★ {score}% Match
               </span>
 
+              {/* Live or Demo Badge */}
+              {job.isDemo ? (
+                <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                  DEMO
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-950/80 border border-emerald-700/80 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  LIVE
+                </span>
+              )}
+
               {/* Status Badge */}
               <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
                 {job.status}

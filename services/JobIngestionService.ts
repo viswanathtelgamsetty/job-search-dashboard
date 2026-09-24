@@ -1,9 +1,10 @@
-import type { Job, SearchProfile } from "@/types";
+import type { Job, ProviderStatus, SearchProfile } from "@/types";
 import {
   AdzunaJobProvider,
   ArbeitnowJobProvider,
   GreenhouseCareerProvider,
   RemotiveJobProvider,
+  type DiscoveredJobRaw,
   type JobProvider,
 } from "./job-providers";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
@@ -27,27 +28,70 @@ export class JobIngestionService {
   async runIngestion(
     profile: SearchProfile = defaultSearchProfile,
     existingJobs: Job[] = []
-  ): Promise<{ newJobs: Job[]; totalIngested: number; allJobs: Job[] }> {
-    const rawResults = await Promise.allSettled(
-      this.providers.map(async (provider) => {
-        try {
-          return await provider.searchJobs({
-            keywords: profile.targetSkills,
-            roleFamilies: profile.targetRoleFamilies,
-          });
-        } catch (err) {
-          console.warn(`Provider ${provider.name} failed:`, err);
-          return [];
-        }
-      })
-    );
-
+  ): Promise<{
+    newJobs: Job[];
+    totalIngested: number;
+    allJobs: Job[];
+    providers: ProviderStatus[];
+  }> {
+    const providerStatuses: ProviderStatus[] = [];
     const discoveredJobs: Job[] = [];
 
-    for (const res of rawResults) {
-      if (res.status === "fulfilled" && Array.isArray(res.value)) {
-        for (const raw of res.value) {
-          // Normalize salary
+    // Query each provider individually so errors are explicitly captured
+    for (const provider of this.providers) {
+      const isEnabled = profile.enabledProviders
+        ? profile.enabledProviders.includes(provider.id)
+        : true;
+
+      if (!isEnabled) {
+        providerStatuses.push({
+          id: provider.id,
+          name: provider.name,
+          enabled: false,
+          success: false,
+          jobsReturned: 0,
+          details: "Disabled by user search configuration",
+        });
+        continue;
+      }
+
+      if (!provider.isConfigured) {
+        providerStatuses.push({
+          id: provider.id,
+          name: provider.name,
+          enabled: false,
+          success: false,
+          jobsReturned: 0,
+          details:
+            provider.id === "adzuna"
+              ? "Disabled: ADZUNA_APP_ID and ADZUNA_APP_KEY credentials required in .env"
+              : "Provider credentials not configured",
+        });
+        continue;
+      }
+
+      const boardsQueried =
+        provider instanceof GreenhouseCareerProvider
+          ? provider.getBoardsQueried()
+          : undefined;
+
+      try {
+        const rawResults: DiscoveredJobRaw[] = await provider.searchJobs({
+          keywords: profile.targetSkills,
+          roleFamilies: profile.targetRoleFamilies,
+        });
+
+        providerStatuses.push({
+          id: provider.id,
+          name: provider.name,
+          enabled: true,
+          success: true,
+          jobsReturned: rawResults.length,
+          boardsQueried,
+          details: `Successfully fetched ${rawResults.length} live vacancies`,
+        });
+
+        for (const raw of rawResults) {
           const parsedSalary = parseAndNormalizeSalary(
             raw.salaryText,
             raw.salaryMin,
@@ -55,7 +99,6 @@ export class JobIngestionService {
             raw.currency
           );
 
-          // Extract travel details
           const travel = extractTravelDetails(
             `${raw.title} ${raw.location} ${raw.description || ""}`,
             {
@@ -65,7 +108,6 @@ export class JobIngestionService {
             }
           );
 
-          // Transparent rule-based match
           const match = evaluateJobMatch(
             {
               title: raw.title,
@@ -118,6 +160,19 @@ export class JobIngestionService {
 
           discoveredJobs.push(job);
         }
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : "Provider request failed";
+        console.error(`Provider ${provider.name} failed:`, err);
+        providerStatuses.push({
+          id: provider.id,
+          name: provider.name,
+          enabled: true,
+          success: false,
+          jobsReturned: 0,
+          error: errorMsg,
+          boardsQueried,
+          details: `Error encountered: ${errorMsg}`,
+        });
       }
     }
 
@@ -132,6 +187,7 @@ export class JobIngestionService {
       newJobs: newlyAdded,
       totalIngested: discoveredJobs.length,
       allJobs: deduplicated,
+      providers: providerStatuses,
     };
   }
 }

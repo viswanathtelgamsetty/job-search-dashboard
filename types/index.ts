@@ -147,6 +147,17 @@ export interface DashboardStats {
   conversionRate: number; // (offers / (applied + screening + technical + final + offers)) * 100
 }
 
+export interface ProviderStatus {
+  id: string;
+  name: string;
+  enabled: boolean;
+  success: boolean;
+  jobsReturned: number;
+  error?: string;
+  details?: string;
+  boardsQueried?: string[];
+}
+
 export interface JobFiltersState {
   search: string;
   location: string;
