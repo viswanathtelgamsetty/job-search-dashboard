@@ -7,8 +7,11 @@ import type {
 import {
   AdzunaJobProvider,
   ArbeitnowJobProvider,
+  AshbyCareerProvider,
   GreenhouseCareerProvider,
+  HimalayasJobProvider,
   JobicyJobProvider,
+  LeverCareerProvider,
   RemotiveJobProvider,
   type DiscoveredJobRaw,
   type JobProvider,
@@ -38,6 +41,9 @@ export class JobIngestionService {
       new RemotiveJobProvider(),
       new ArbeitnowJobProvider(),
       new GreenhouseCareerProvider(),
+      new AshbyCareerProvider(),
+      new LeverCareerProvider(),
+      new HimalayasJobProvider(),
       new JobicyJobProvider(),
       new AdzunaJobProvider(),
     ];
@@ -75,7 +81,9 @@ export class JobIngestionService {
       }
 
       const boardsQueried =
-        provider instanceof GreenhouseCareerProvider
+        provider instanceof GreenhouseCareerProvider ||
+        provider instanceof AshbyCareerProvider ||
+        provider instanceof LeverCareerProvider
           ? provider.getBoardsQueried()
           : undefined;
 

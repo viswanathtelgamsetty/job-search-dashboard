@@ -3,4 +3,7 @@ export * from "./ArbeitnowJobProvider";
 export * from "./RemotiveJobProvider";
 export * from "./GreenhouseCareerProvider";
 export * from "./JobicyJobProvider";
+export * from "./AshbyCareerProvider";
+export * from "./LeverCareerProvider";
+export * from "./HimalayasJobProvider";
 export * from "./AdzunaJobProvider";

@@ -1,6 +1,6 @@
 import type { DiscoveredJobRaw, JobProvider } from "./types";
-import { extractTravelDetails } from "@/lib/travelExtractor";
-import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
+import { extractTravelDetails } from "../../lib/travelExtractor.ts";
+import { extractActualJobTechnologies } from "../../lib/technologyMatcher.ts";
 
 export interface GreenhouseBoardConfig {
   token: string;
@@ -17,14 +17,33 @@ export class GreenhouseCareerProvider implements JobProvider {
     // India Tech Hub Employers (Hyderabad & Bangalore centres)
     { token: "highradius", name: "HighRadius", category: "india_hub" },
     { token: "deliveroo", name: "Deliveroo", category: "india_hub" },
+    { token: "groww", name: "Groww", category: "india_hub" },
+    // Global Consulting & Digital Experience
     { token: "thoughtworks", name: "Thoughtworks", category: "consulting" },
+    { token: "slalom", name: "Slalom", category: "consulting" },
+    { token: "vmlenterprisesolutions", name: "VML Enterprise Solutions", category: "consulting" },
+    { token: "valtech", name: "Valtech", category: "consulting" },
+    // CMS & Composable Commerce
+    { token: "contentful", name: "Contentful", category: "cms_commerce" },
+    { token: "contentstack", name: "Contentstack", category: "cms_commerce" },
+    { token: "storyblok", name: "Storyblok", category: "cms_commerce" },
+    { token: "commercetools", name: "commercetools", category: "cms_commerce" },
+    { token: "bloomreach", name: "Bloomreach", category: "cms_commerce" },
+    { token: "automattic", name: "Automattic", category: "cms_commerce" },
+    // Enterprise SaaS, APIs & Cloud Architecture
     { token: "elastic", name: "Elastic", category: "enterprise_saas" },
     { token: "mongodb", name: "MongoDB", category: "enterprise_saas" },
     { token: "okta", name: "Okta", category: "enterprise_saas" },
     { token: "toast", name: "Toast", category: "enterprise_saas" },
-    { token: "contentful", name: "Contentful", category: "cms_commerce" },
-    { token: "slalom", name: "Slalom", category: "consulting" },
-    { token: "automattic", name: "Automattic", category: "cms_commerce" },
+    { token: "workato", name: "Workato", category: "enterprise_saas" },
+    { token: "twilio", name: "Twilio", category: "enterprise_saas" },
+    { token: "datadog", name: "Datadog", category: "enterprise_saas" },
+    { token: "stripe", name: "Stripe", category: "enterprise_saas" },
+    { token: "gitlab", name: "GitLab", category: "enterprise_saas" },
+    { token: "pagerduty", name: "PagerDuty", category: "enterprise_saas" },
+    { token: "intercom", name: "Intercom", category: "enterprise_saas" },
+    { token: "gusto", name: "Gusto", category: "enterprise_saas" },
+    { token: "affirm", name: "Affirm", category: "enterprise_saas" },
   ];
 
   getBoardsQueried(): string[] {
