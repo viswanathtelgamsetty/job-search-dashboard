@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jobIngestionService } from "@/services/JobIngestionService";
 import { defaultSearchProfile } from "@/config/defaultProfile";
+import { setServerJobs } from "@/lib/serverJobStore";
 import type { Job, SearchProfile } from "@/types";
 
 export async function POST(request: Request) {
@@ -17,6 +18,14 @@ export async function POST(request: Request) {
 
     const result = await jobIngestionService.runIngestion(profile, existingJobs);
 
+    // Persist real jobs to the server-side store so GET /api/jobs returns them.
+    // setServerJobs strips demo records at write-time (demoCount below is always 0).
+    setServerJobs(result.allJobs);
+
+    const demoCount = result.allJobs.filter(
+      (j) => j.isDemo === true || j.id.startsWith("demo-") || j.company.includes("(Demo)")
+    ).length;
+
     return NextResponse.json({
       success: true,
       totalDiscovered: result.totalIngested,
@@ -24,6 +33,7 @@ export async function POST(request: Request) {
       jobs: result.allJobs,
       providers: result.providers,
       metrics: result.metrics,
+      demoCount,
       timestamp: new Date().toISOString(),
     });
   } catch (err: unknown) {

@@ -8,38 +8,43 @@ import { classifyRoleFamily } from "@/lib/roleClassifier";
 import { detectSeniority } from "@/lib/seniorityDetector";
 import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 import { calculateJobFreshness } from "@/lib/jobQuality";
+import { getServerJobs } from "@/lib/serverJobStore";
 import type { Job } from "@/types";
 
 /**
  * GET /api/jobs
  *
- * Returns an empty job list. Real jobs are fetched via POST /api/jobs/sync
- * and persisted client-side in localStorage.
+ * Returns the currently stored REAL active jobs from the server-side job store.
+ * - Returns [] when no sync has occurred yet (cold start).
+ * - NEVER returns demo jobs (isDemo=true / id starts "demo-" / company has "(Demo)").
+ * - Does NOT trigger provider network calls — read-only.
  *
- * Demo/sample fixtures are NEVER returned here to prevent demo records from
- * contaminating the production job collection, metrics, or application queues.
+ * Persistence flow:
+ *   POST /api/jobs/sync  →  store updated  →  GET /api/jobs  →  same real jobs
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.toLowerCase();
 
-  // Real production endpoint: no demo data is included here.
-  // The client populates jobs by calling POST /api/jobs/sync.
-  const jobs: Job[] = [];
+  // Read from the server-side job store (populated by POST /api/jobs/sync).
+  // No demo records are ever present — stripDemoJobs() runs at store write-time.
+  const storedJobs = getServerJobs();
 
   const filtered = search
-    ? jobs.filter(
+    ? storedJobs.filter(
         (j) =>
           j.title.toLowerCase().includes(search) ||
           j.company.toLowerCase().includes(search) ||
           j.skills.some((s) => s.toLowerCase().includes(search))
       )
-    : jobs;
+    : storedJobs;
 
   return NextResponse.json({
     success: true,
     count: filtered.length,
     jobs: filtered,
+    // Expose demo count for contract verification (always 0 in production)
+    demoCount: filtered.filter((j) => j.isDemo === true || j.id.startsWith("demo-")).length,
   });
 }
 
