@@ -8,6 +8,7 @@ import { parseAndNormalizeSalary } from "../lib/salaryParser.ts";
 import { extractTravelDetails } from "../lib/travelExtractor.ts";
 import { evaluateJobMatch } from "../lib/matchingEngine.ts";
 import { extractActualJobTechnologies, matchTargetTechnologies } from "../lib/technologyMatcher.ts";
+import { extractDomainMatches } from "../lib/domainMatcher.ts";
 import { defaultSearchProfile } from "../config/defaultProfile.ts";
 
 // 1. Role Family Classification Tests
@@ -365,4 +366,153 @@ test("TEST: High relevance strictly requires target technology match, seniority,
   assert.ok(matchWithTech.reasons.some((r) => r.includes("Contentful")));
   assert.ok(matchWithTech.reasons.some((r) => r.includes("Next.js")));
 });
+
+// 10. Phase 3.2 — Career Fit & Domain Matching Tests
+test("TEST 1: Frontend Architect + React + Next.js -> HIGH_RELEVANCE & FRONTEND domain", () => {
+  const job = {
+    title: "Frontend Architect",
+    company: "Acme Global",
+    location: "Hyderabad, India",
+    remoteType: "HYBRID" as const,
+    skills: ["React", "Next.js", "TypeScript"],
+    roleFamily: "FRONTEND_ARCHITECT" as const,
+    seniority: "ARCHITECT" as const,
+    experienceMin: 12,
+    description: "Lead frontend architecture for digital experience using React, Next.js and TypeScript.",
+  };
+
+  const match = evaluateJobMatch(job, defaultSearchProfile);
+  assert.strictEqual(match.careerFit, "HIGH_RELEVANCE");
+  assert.strictEqual(match.dimensions.roleFit.strength, "STRONG");
+  assert.strictEqual(match.dimensions.technologyFit.strength, "STRONG");
+  assert.ok(match.domainMatches.some((d) => d.domain === "FRONTEND" && d.matched));
+  assert.ok(match.whyThisFits.some((r) => r.includes("React")));
+});
+
+test("TEST 2: Senior Shopify + Next.js + Contentful + Commerce -> High Career Fit with domain evidence", () => {
+  const job = {
+    title: "Senior Shopify Developer",
+    company: "Commerce Studio",
+    location: "Worldwide (Remote)",
+    remoteType: "REMOTE" as const,
+    skills: ["Next.js", "Contentful", "Commerce", "TypeScript"],
+    roleFamily: "COMMERCE" as const,
+    seniority: "SENIOR" as const,
+    experienceMin: 8,
+    description: "Building custom Shopify Plus storefronts using Hydrogen, Next.js, and Contentful headless CMS.",
+  };
+
+  const match = evaluateJobMatch(job, defaultSearchProfile);
+  // Qualifies as HIGH_RELEVANCE or RELEVANT due to deep domain specialization
+  assert.ok(match.careerFit === "HIGH_RELEVANCE" || match.careerFit === "RELEVANT");
+  assert.ok(match.domainMatches.some((d) => d.domain === "COMMERCE" && d.matched));
+  assert.ok(match.domainMatches.some((d) => d.domain === "CMS" && d.matched));
+  assert.ok(match.domainMatches.some((d) => d.domain === "FRONTEND" && d.matched));
+  assert.strictEqual(match.dimensions.technologyFit.strength, "STRONG");
+});
+
+test("TEST 3: Solutions Architect + Node.js + AWS + travel -> Positive travel signal & client-facing fit", () => {
+  const job = {
+    title: "Solutions Architect",
+    company: "Enterprise Cloud Co",
+    location: "Mumbai, India",
+    remoteType: "HYBRID" as const,
+    skills: ["Node.js", "AWS"],
+    roleFamily: "SOLUTIONS_ARCHITECT" as const,
+    seniority: "ARCHITECT" as const,
+    experienceMin: 12,
+    travelType: "INTERNATIONAL_TRAVEL" as const,
+    travelPercentage: 25,
+    travelEvidence: "Ability to travel internationally up to 25% to client sites",
+    description: "Lead enterprise solutions architecture, customer consulting, and integration using Node.js and AWS.",
+  };
+
+  const match = evaluateJobMatch(job, defaultSearchProfile);
+  assert.ok(match.careerFit === "HIGH_RELEVANCE" || match.careerFit === "RELEVANT");
+  assert.strictEqual(match.dimensions.travelFit.strength, "STRONG");
+  assert.strictEqual(match.dimensions.clientFacingFit.strength, "STRONG");
+  assert.ok(match.whyThisFits.some((r) => r.includes("travel")));
+});
+
+test("TEST 4: SRE Architect + AWS + Kubernetes -> NOT HIGH_RELEVANCE merely because of title", () => {
+  const job = {
+    title: "SRE Architect",
+    company: "Infrastructure Tech",
+    location: "Hyderabad, India",
+    remoteType: "HYBRID" as const,
+    skills: ["AWS", "Kubernetes", "Docker", "Terraform"],
+    roleFamily: "TECHNICAL_ARCHITECT" as const,
+    seniority: "ARCHITECT" as const,
+    experienceMin: 12,
+    description: "Site reliability engineering, observability, metrics, and incident management with Kubernetes.",
+  };
+
+  const match = evaluateJobMatch(job, defaultSearchProfile);
+  // SRE is adjacent domain, must NOT be HIGH_RELEVANCE
+  assert.notStrictEqual(match.careerFit, "HIGH_RELEVANCE");
+  assert.ok(match.careerFit === "RELEVANT" || match.careerFit === "POSSIBLE");
+  assert.ok(match.domainMatches.some((d) => d.domain === "SRE" && d.matched));
+  assert.ok(match.potentialGaps.some((g) => g.includes("Target technologies")));
+});
+
+test("TEST 5: Delivery Director with no technical evidence -> POSSIBLE or LOW_RELEVANCE", () => {
+  const job = {
+    title: "Delivery Director",
+    company: "Corporate Ops",
+    location: "Hyderabad, India",
+    remoteType: "HYBRID" as const,
+    skills: [],
+    roleFamily: "OTHER" as const,
+    seniority: "DIRECTOR" as const,
+    experienceMin: 15,
+    description: "Manage delivery timelines, operational budgets, and resource allocation across business units.",
+  };
+
+  const match = evaluateJobMatch(job, defaultSearchProfile);
+  assert.notStrictEqual(match.careerFit, "HIGH_RELEVANCE");
+  assert.ok(match.careerFit === "POSSIBLE" || match.careerFit === "LOW_RELEVANCE");
+  assert.strictEqual(match.dimensions.technologyFit.strength, "NONE");
+});
+
+test("TEST 6: React/Next.js frontend role -> Evidence-based FRONTEND domain match", () => {
+  const domains = extractDomainMatches(
+    "Senior Frontend Developer",
+    "Building scalable user interfaces using React, Next.js and CSS modules.",
+    ["React", "Next.js"]
+  );
+  assert.ok(domains.some((d) => d.domain === "FRONTEND" && d.matched));
+  const frontDetail = domains.find((d) => d.domain === "FRONTEND");
+  assert.ok(frontDetail?.evidence && frontDetail.evidence.length > 0);
+});
+
+test("TEST 7: CMS Architect -> CMS domain match with evidence", () => {
+  const domains = extractDomainMatches(
+    "Headless CMS Architect",
+    "Architecting enterprise content hubs with Contentful and decoupled CMS platforms.",
+    ["Contentful"]
+  );
+  assert.ok(domains.some((d) => d.domain === "CMS" && d.matched));
+  assert.ok(domains.some((d) => d.domain === "TECHNICAL_ARCHITECTURE" && d.matched));
+});
+
+test("TEST 8: Commerce Architect -> COMMERCE domain match with evidence", () => {
+  const domains = extractDomainMatches(
+    "Digital Commerce Architect",
+    "Designing commerce integrations with Shopify Plus, commercetools, and payment APIs.",
+    ["Commerce"]
+  );
+  assert.ok(domains.some((d) => d.domain === "COMMERCE" && d.matched));
+  assert.ok(domains.some((d) => d.domain === "TECHNICAL_ARCHITECTURE" && d.matched));
+});
+
+test("TEST 9: Client-facing Professional Services Architect -> CLIENT_CONSULTING & PROFESSIONAL_SERVICES", () => {
+  const domains = extractDomainMatches(
+    "Principal Architect, Professional Services",
+    "Client-facing architecture, technical advisory, customer implementation, and executive stakeholder engagement.",
+    []
+  );
+  assert.ok(domains.some((d) => d.domain === "CLIENT_CONSULTING" && d.matched));
+  assert.ok(domains.some((d) => d.domain === "PROFESSIONAL_SERVICES" && d.matched));
+});
+
 

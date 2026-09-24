@@ -4,6 +4,7 @@ import type { Job } from "@/types";
 import { useState } from "react";
 import { formatRoleFamily } from "@/lib/roleClassifier";
 import { formatSeniorityLevel } from "@/lib/seniorityDetector";
+import { formatDomainName } from "@/lib/domainMatcher";
 
 interface JobCardProps {
   job: Job;
@@ -23,22 +24,22 @@ export function JobCard({
   const [showAllReasons, setShowAllReasons] = useState(false);
 
   // Relevance styling
-  const bucket = job.match?.relevanceBucket || "POSSIBLE";
+  const bucket = job.match?.careerFit || job.match?.relevanceBucket || "POSSIBLE";
   const relevanceConfig = {
     HIGH_RELEVANCE: {
-      label: "🌟 HIGH RELEVANCE",
+      label: "🌟 CAREER FIT: HIGH RELEVANCE",
       style: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40 font-bold",
     },
     RELEVANT: {
-      label: "✨ RELEVANT",
+      label: "✨ CAREER FIT: RELEVANT",
       style: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-semibold",
     },
     POSSIBLE: {
-      label: "🔍 POSSIBLE",
+      label: "🔍 CAREER FIT: POSSIBLE",
       style: "bg-amber-500/15 text-amber-300 border-amber-500/40",
     },
     LOW_RELEVANCE: {
-      label: "LOW RELEVANCE",
+      label: "CAREER FIT: LOW RELEVANCE",
       style: "bg-slate-800/80 text-slate-400 border-slate-700",
     },
   }[bucket];
@@ -152,6 +153,21 @@ export function JobCard({
                 Source: {job.source}
               </span>
             </div>
+
+            {/* Career Domains Badges */}
+            {job.domains && job.domains.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 mr-0.5">Domains:</span>
+                {job.domains.map((d) => (
+                  <span
+                    key={d}
+                    className="rounded-md bg-indigo-950/40 border border-indigo-800/40 px-2 py-0.5 text-[11px] font-medium text-indigo-200"
+                  >
+                    🏷️ {formatDomainName(d)}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Metrics Bar: Location, Remote, Salary, Travel, Freshness */}
@@ -261,28 +277,28 @@ export function JobCard({
             })}
           </div>
 
-          {/* Why this matches (Concrete Reasons) */}
-          {job.match?.reasons && job.match.reasons.length > 0 && (
+          {/* WHY THIS FITS (Career Fit Evidence) */}
+          {((job.match?.whyThisFits && job.match.whyThisFits.length > 0) || (job.match?.reasons && job.match.reasons.length > 0)) && (
             <div className="mt-3 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3.5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                  <span>✓ WHY THIS MATCHES</span>
+                  <span>✓ WHY THIS FITS</span>
                   <span className="text-slate-500 font-normal">
-                    (Deterministic Rule-Based Match)
+                    (Evidence-Based Career Fit)
                   </span>
                 </span>
-                {job.match.reasons.length > 3 && (
+                {(job.match.whyThisFits || job.match.reasons).length > 3 && (
                   <button
                     onClick={() => setShowAllReasons(!showAllReasons)}
                     className="text-[11px] text-cyan-400 hover:underline"
                   >
-                    {showAllReasons ? "Show fewer" : `+${job.match.reasons.length - 3} more`}
+                    {showAllReasons ? "Show fewer" : `+${(job.match.whyThisFits || job.match.reasons).length - 3} more`}
                   </button>
                 )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-slate-200">
-                {(showAllReasons ? job.match.reasons : job.match.reasons.slice(0, 3)).map(
+                {(showAllReasons ? (job.match.whyThisFits || job.match.reasons) : (job.match.whyThisFits || job.match.reasons).slice(0, 3)).map(
                   (reason, idx) => (
                     <div key={idx} className="flex items-center gap-1.5 font-medium text-[11px]">
                       <span className="text-emerald-400 font-bold">✓</span>
@@ -292,13 +308,13 @@ export function JobCard({
                 )}
               </div>
 
-              {/* Why it may NOT match (Cautions) */}
-              {job.match.cautions && job.match.cautions.length > 0 && (
+              {/* POTENTIAL GAPS */}
+              {((job.match?.potentialGaps && job.match.potentialGaps.length > 0) || (job.match?.cautions && job.match.cautions.length > 0)) && (
                 <div className="pt-2 border-t border-slate-800/80 space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
-                    ⚠️ WHY IT MAY NOT MATCH / CAUTIONS
+                    ⚠️ POTENTIAL GAPS
                   </span>
-                  {job.match.cautions.map((caution, idx) => (
+                  {(job.match.potentialGaps || job.match.cautions).map((caution, idx) => (
                     <div key={idx} className="flex items-center gap-1.5 text-[11px] text-amber-300/90 font-medium">
                       <span className="text-amber-400 font-bold">!</span>
                       <span>{caution.replace(/^!\s*/, "")}</span>

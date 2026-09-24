@@ -13,6 +13,9 @@ const rawDemoJobs: Array<
     | "actualJobTechnologies"
     | "matchedTargetTechnologies"
     | "technologyMatchDetails"
+    | "domains"
+    | "domainMatches"
+    | "careerFit"
   >
 > = [
   {
@@ -298,6 +301,9 @@ export const demoSeedJobs: Job[] = rawDemoJobs.map((raw) => {
     sourceLocation: raw.location,
     sourceDescription: raw.description,
     sourceSkills: raw.skills,
+    domains: match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER").map((d) => d.domain),
+    domainMatches: match.domainMatches,
+    careerFit: match.careerFit,
     match,
   };
 });

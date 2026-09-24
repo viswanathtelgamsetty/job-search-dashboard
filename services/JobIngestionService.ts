@@ -185,7 +185,7 @@ export class JobIngestionService {
             conversionDate: parsedSalary.conversionDate,
             isSalaryEstimated: parsedSalary.isEstimated,
 
-            // Seniority & Skills (Evidence-based separation)
+            // Seniority & Skills & Domains (Evidence-based separation)
             seniority: seniorityResult.level,
             seniorityEvidence: seniorityResult.evidence,
             experienceMin: seniorityResult.experienceMin || 10,
@@ -196,6 +196,9 @@ export class JobIngestionService {
             technologyMatchDetails: match.breakdown.technologyMatch.details || [],
             roleFamily: roleClassification.primary,
             secondaryRoleFamilies: roleClassification.secondary,
+            domains: match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER").map((d) => d.domain),
+            domainMatches: match.domainMatches,
+            careerFit: match.careerFit,
 
             // Raw source auditing (Requirement 7)
             sourceTitle: raw.sourceTitle || raw.title,

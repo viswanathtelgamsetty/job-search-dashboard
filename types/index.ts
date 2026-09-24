@@ -104,6 +104,54 @@ export type FreshnessStatus =
   | "OLDER"
   | "UNKNOWN";
 
+export type CareerDomain =
+  | "FRONTEND"
+  | "DIGITAL_EXPERIENCE"
+  | "CMS"
+  | "COMMERCE"
+  | "ENTERPRISE_INTEGRATION"
+  | "SOLUTIONS_ARCHITECTURE"
+  | "TECHNICAL_ARCHITECTURE"
+  | "CLIENT_CONSULTING"
+  | "PROFESSIONAL_SERVICES"
+  | "SOFTWARE_ENGINEERING"
+  | "DEVOPS"
+  | "SRE"
+  | "DATA_AI"
+  | "SECURITY"
+  | "OTHER";
+
+export interface DomainMatchDetail {
+  domain: CareerDomain;
+  matched: boolean;
+  evidence: string | null;
+}
+
+export type FitStrength = "STRONG" | "MODERATE" | "WEAK" | "NONE";
+
+export interface DimensionFit {
+  matched: boolean;
+  strength: FitStrength;
+  evidence: string[];
+  reason: string;
+}
+
+export interface CareerFitDimensions {
+  roleFit: DimensionFit;
+  technologyFit: DimensionFit;
+  domainFit: DimensionFit;
+  seniorityFit: DimensionFit;
+  locationFit: DimensionFit;
+  remoteFit: DimensionFit;
+  travelFit: DimensionFit;
+  clientFacingFit: DimensionFit;
+  freshnessFit: {
+    status: FreshnessStatus;
+    daysAgo?: number;
+    label: string;
+  };
+}
+
 export interface TechnologyMatchDetail {
   technology: string;
   matched: boolean;
@@ -118,8 +166,13 @@ export interface MatchCriterion {
 
 export interface JobMatchDetails {
   relevanceBucket: RelevanceBucket;
+  careerFit: RelevanceBucket; // Career Fit classification
   reasons: string[]; // 2-5 concrete reasons ("✓ ...")
+  whyThisFits: string[]; // "WHY THIS FITS"
   cautions: string[]; // Reasons why it may not match ("! ...")
+  potentialGaps: string[]; // "POTENTIAL GAPS"
+  domainMatches: DomainMatchDetail[];
+  dimensions: CareerFitDimensions;
   missingOrNeutral?: string[];
   breakdown: {
     roleMatch: MatchCriterion;
@@ -134,7 +187,7 @@ export interface JobMatchDetails {
     salaryMatch: MatchCriterion;
     clientFacingMatch: MatchCriterion;
   };
-  overallScore?: number; // Deterministic legacy score helper
+  overallScore?: number; // Deterministic explainable sorting score
 }
 
 export interface Job {
@@ -170,13 +223,16 @@ export interface Job {
   experienceMin?: number;
   experienceMax?: number;
 
-  // Skills & Role Families (Strictly separated)
+  // Skills & Role Families & Domains (Strictly separated)
   skills: string[]; // actualJobTechnologies
   actualJobTechnologies: string[];
   matchedTargetTechnologies: string[];
   technologyMatchDetails: TechnologyMatchDetail[];
   roleFamily: RoleFamily;
   secondaryRoleFamilies?: RoleFamily[];
+  domains: CareerDomain[];
+  domainMatches: DomainMatchDetail[];
+  careerFit: RelevanceBucket;
   travel: TravelDetails;
   description?: string;
 
@@ -304,6 +360,8 @@ export interface JobFiltersState {
   travelType: string;
   source: string;
   technology: string;
+  domain: string;
+  clientFacing: string;
   relevance: string;
   company: string;
   salaryState?: string;

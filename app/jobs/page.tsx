@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Job, JobFiltersState, JobStatus, ProviderStatus } from "@/types";
+import type { CareerDomain, Job, JobFiltersState, JobStatus, ProviderStatus } from "@/types";
 import { getStoredJobs, saveJobs, updateJobStatusInStorage } from "@/lib/storage";
 import { JobCard } from "@/components/jobs/JobCard";
 import { JobFilters } from "@/components/jobs/JobFilters";
@@ -17,6 +17,8 @@ const initialFilters: JobFiltersState = {
   travelType: "ALL",
   source: "ALL",
   technology: "ALL",
+  domain: "ALL",
+  clientFacing: "ALL",
   relevance: "ALL",
   company: "ALL",
   postedWithinDays: null,
@@ -132,15 +134,37 @@ export default function MarketRadarPage() {
           if (!matchesSearch) return false;
         }
 
-        // Relevance Bucket Filter
+        // Career Fit / Relevance Bucket Filter
         if (filters.relevance !== "ALL") {
-          if (job.match?.relevanceBucket !== filters.relevance) return false;
+          const fit = job.careerFit || job.match?.relevanceBucket;
+          if (fit !== filters.relevance) return false;
+        }
+
+        // Career Domain Filter
+        if (filters.domain && filters.domain !== "ALL") {
+          const hasDomain =
+            job.domains?.includes(filters.domain as CareerDomain) ||
+            job.domainMatches?.some((d) => d.matched && d.domain === filters.domain);
+          if (!hasDomain) return false;
+        }
+
+        // Client-Facing Filter
+        if (filters.clientFacing && filters.clientFacing !== "ALL") {
+          const isClientFacing =
+            job.match?.dimensions?.clientFacingFit?.matched ||
+            ["SOLUTIONS_ARCHITECT", "TECHNICAL_CONSULTANT", "IMPLEMENTATION_CONSULTANT", "PROFESSIONAL_SERVICES"].includes(
+              job.roleFamily
+            );
+          if (filters.clientFacing === "YES" && !isClientFacing) return false;
+          if (filters.clientFacing === "NO" && isClientFacing) return false;
         }
 
         // Technology Filter
         if (filters.technology !== "ALL") {
           const techLower = filters.technology.toLowerCase();
-          const hasTech = job.skills.some((s) => s.toLowerCase() === techLower) ||
+          const hasTech =
+            job.skills.some((s) => s.toLowerCase() === techLower) ||
+            (job.actualJobTechnologies && job.actualJobTechnologies.some((s) => s.toLowerCase() === techLower)) ||
             (job.description && job.description.toLowerCase().includes(techLower)) ||
             job.title.toLowerCase().includes(techLower);
           if (!hasTech) return false;

@@ -36,6 +36,8 @@ export function JobFilters({
     filters.travelType !== "ALL" ||
     filters.source !== "ALL" ||
     filters.technology !== "ALL" ||
+    filters.domain !== "ALL" ||
+    filters.clientFacing !== "ALL" ||
     filters.relevance !== "ALL" ||
     filters.company !== "ALL" ||
     filters.experienceLevel !== "ALL" ||
@@ -208,26 +210,31 @@ export function JobFilters({
           </select>
         </div>
 
-        {/* Location Dropdown */}
+        {/* Career Domain Filter */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Location
+            Career Domain
           </label>
           <select
-            value={filters.location}
-            onChange={(e) => update({ location: e.target.value })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+            value={filters.domain || "ALL"}
+            onChange={(e) => update({ domain: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500 font-medium"
           >
-            <option value="ALL">All Locations</option>
-            <option value="HYDERABAD">Hyderabad (Target)</option>
-            <option value="BANGALORE">Bangalore / Bengaluru</option>
-            <option value="PUNE">Pune</option>
-            <option value="CHENNAI">Chennai</option>
-            <option value="MUMBAI">Mumbai</option>
-            <option value="DELHI_NCR">Delhi NCR / Gurgaon</option>
-            <option value="INDIA">All India (Metro & Remote)</option>
-            <option value="REMOTE_INDIA">Remote from India</option>
-            <option value="REMOTE_GLOBAL">Worldwide Remote</option>
+            <option value="ALL">All Domains</option>
+            <option value="FRONTEND">🎨 Frontend Architecture</option>
+            <option value="COMMERCE">🛍️ Commerce & Headless</option>
+            <option value="CMS">📝 Headless CMS</option>
+            <option value="DIGITAL_EXPERIENCE">🌐 Digital Experience / DXP</option>
+            <option value="SOLUTIONS_ARCHITECTURE">📐 Solutions Architecture</option>
+            <option value="TECHNICAL_ARCHITECTURE">🏗️ Technical Architecture</option>
+            <option value="CLIENT_CONSULTING">💼 Client Consulting</option>
+            <option value="ENTERPRISE_INTEGRATION">🔌 Enterprise Integration / APIs</option>
+            <option value="PROFESSIONAL_SERVICES">🚀 Professional Services</option>
+            <option value="SOFTWARE_ENGINEERING">💻 Software Engineering</option>
+            <option value="DEVOPS">⚙️ DevOps</option>
+            <option value="SRE">🛡️ SRE & Observability</option>
+            <option value="DATA_AI">🤖 Data & AI</option>
+            <option value="SECURITY">🔒 Security</option>
           </select>
         </div>
 
@@ -254,6 +261,29 @@ export function JobFilters({
             <option value="Node.js">Node.js</option>
             <option value="GraphQL">GraphQL</option>
             <option value="Design Systems">Design Systems</option>
+          </select>
+        </div>
+
+        {/* Location Dropdown */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Location
+          </label>
+          <select
+            value={filters.location}
+            onChange={(e) => update({ location: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Locations</option>
+            <option value="HYDERABAD">Hyderabad (Target)</option>
+            <option value="BANGALORE">Bangalore / Bengaluru</option>
+            <option value="PUNE">Pune</option>
+            <option value="CHENNAI">Chennai</option>
+            <option value="MUMBAI">Mumbai</option>
+            <option value="DELHI_NCR">Delhi NCR / Gurgaon</option>
+            <option value="INDIA">All India (Metro & Remote)</option>
+            <option value="REMOTE_INDIA">Remote from India</option>
+            <option value="REMOTE_GLOBAL">Worldwide Remote</option>
           </select>
         </div>
 
@@ -296,6 +326,42 @@ export function JobFilters({
             <option value="NO_TRAVEL_MENTIONED">No Travel Mentioned</option>
           </select>
         </div>
+      </div>
+
+      {/* Secondary Filter Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1 border-t border-slate-800/60">
+        {/* Client-Facing / Consulting */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Client-Facing
+          </label>
+          <select
+            value={filters.clientFacing || "ALL"}
+            onChange={(e) => update({ clientFacing: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Engagements</option>
+            <option value="YES">🤝 Client-Facing / Consulting</option>
+            <option value="NO">💻 Internal Platform Only</option>
+          </select>
+        </div>
+
+        {/* Work Model */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Remote / Work Model
+          </label>
+          <select
+            value={filters.remoteType}
+            onChange={(e) => update({ remoteType: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Models</option>
+            <option value="REMOTE">100% Remote</option>
+            <option value="HYBRID">Hybrid</option>
+            <option value="ONSITE">Onsite</option>
+          </select>
+        </div>
 
         {/* Company Filter */}
         <div>
@@ -313,26 +379,6 @@ export function JobFilters({
                 {c}
               </option>
             ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Secondary Filter Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 border-t border-slate-800/60">
-        {/* Work Model */}
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Remote / Work Model
-          </label>
-          <select
-            value={filters.remoteType}
-            onChange={(e) => update({ remoteType: e.target.value })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All Models</option>
-            <option value="REMOTE">100% Remote</option>
-            <option value="HYBRID">Hybrid</option>
-            <option value="ONSITE">Onsite</option>
           </select>
         </div>
 
