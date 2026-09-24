@@ -132,15 +132,47 @@ export function classifyRoleFamily(
     evidence.push(`Title matches Professional Services: "${title}"`);
   }
 
-  // 12. SENIOR_FRONTEND_ENGINEER
+  // 12. SENIOR_FRONTEND_ENGINEER (includes Frontend Web Application Developer)
   if (
-    /\b(senior\s+frontend|sr\.?\s+frontend|senior\s+front[- ]end|senior\s+ui\s+engineer|staff\s+frontend|principal\s+frontend|senior\s+react|senior\s+web\s+developer)\b/i.test(
+    /\b(senior\s+frontend|sr\.?\s+frontend|senior\s+front[- ]end|senior\s+ui\s+engineer|staff\s+frontend|principal\s+frontend|senior\s+react|senior\s+web\s+developer|frontend\s+(?:web\s+application\s+)?developer|frontend\s+engineer|front[- ]end\s+developer|ui\s+developer|ui\s+engineer|web\s+application\s+developer)\b/i.test(
       t
     ) ||
-    (/\b(frontend|front[- ]end|ui\s+engineer|react)\b/i.test(t) && /\b(senior|sr|lead|staff)\b/i.test(t))
+    (/\b(frontend|front[- ]end|ui\s+engineer|react)\b/i.test(t) && /\b(senior|sr|lead|staff|developer|engineer)\b/i.test(t))
   ) {
-    families.push("SENIOR_FRONTEND_ENGINEER");
-    evidence.push(`Title matches Senior Frontend Engineer: "${title}"`);
+    if (!families.includes("FRONTEND_ARCHITECT")) {
+      families.push("SENIOR_FRONTEND_ENGINEER");
+      evidence.push(`Title matches Frontend Engineering: "${title}"`);
+    }
+  }
+
+  // 13. DATA_AI
+  if (
+    /\b(data\s+scientist|machine\s+learning|ai\s+engineer|data\s+engineer|deep\s+learning|ai\s+researcher|data\s+analyst|ai\s+specialist|lead\s+data\s+scientist|principal\s+data\s+scientist)\b/i.test(
+      t
+    )
+  ) {
+    families.push("DATA_AI");
+    evidence.push(`Title matches Data & AI role: "${title}"`);
+  }
+
+  // 14. SOFTWARE_ENGINEERING (includes QA Engineer, SDET, General Dev)
+  if (
+    /\b(qa\s+engineer|quality\s+assurance|test\s+engineer|sdet|test\s+automation|software\s+developer|software\s+engineer|full-?stack\s+engineer|backend\s+engineer|application\s+developer)\b/i.test(
+      t
+    ) &&
+    !families.some((f) => [
+      "FRONTEND_ARCHITECT",
+      "TECHNICAL_ARCHITECT",
+      "SOLUTIONS_ARCHITECT",
+      "TECHNICAL_LEAD",
+      "SENIOR_FRONTEND_ENGINEER",
+      "COMMERCE",
+      "CMS_DIGITAL_EXPERIENCE",
+      "DATA_AI",
+    ].includes(f))
+  ) {
+    families.push("SOFTWARE_ENGINEERING");
+    evidence.push(`Title matches Software / Testing Engineering: "${title}"`);
   }
 
   // Check description hints if title was ambiguous
@@ -199,6 +231,10 @@ export function formatRoleFamily(role: RoleFamily): string {
       return "Commerce Consultant";
     case "ENTERPRISE_INTEGRATION":
       return "Enterprise Integration";
+    case "DATA_AI":
+      return "Data & AI";
+    case "SOFTWARE_ENGINEERING":
+      return "Software Engineer";
     case "OTHER":
       return "Engineering / Other";
   }

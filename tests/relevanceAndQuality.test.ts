@@ -515,4 +515,77 @@ test("TEST 9: Client-facing Professional Services Architect -> CLIENT_CONSULTING
   assert.ok(domains.some((d) => d.domain === "PROFESSIONAL_SERVICES" && d.matched));
 });
 
+// 11. Phase 3.2.1 — Anti-Contamination Domain Matching Regression Tests
+test("REGRESSION: Data Scientist + React mention -> DATA_AI, not FRONTEND", () => {
+  const title = "Senior Data Scientist";
+  const desc = "Build predictive models and ML pipelines. Our company stack includes Python, PyTorch, React, and AWS.";
+  const domains = extractDomainMatches(title, desc, ["Python", "React"]);
+
+  assert.ok(domains.some((d) => d.domain === "DATA_AI" && d.matched), "Must match DATA_AI");
+  assert.strictEqual(domains.some((d) => d.domain === "FRONTEND"), false, "Must NOT match FRONTEND");
+  assert.strictEqual(classifyRoleFamily(title).primary, "DATA_AI");
+});
+
+test("REGRESSION: QA Engineer + Shopify mention -> QA/OTHER/SOFTWARE_ENGINEERING, not COMMERCE", () => {
+  const title = "Senior QA Engineer";
+  const desc = "Conduct manual and automated testing for web applications. The client uses Shopify for their store.";
+  const domains = extractDomainMatches(title, desc, ["Testing", "Shopify"]);
+
+  assert.strictEqual(domains.some((d) => d.domain === "COMMERCE"), false, "Must NOT match COMMERCE");
+  assert.ok(domains.some((d) => (d.domain === "SOFTWARE_ENGINEERING" || d.domain === "OTHER") && d.matched));
+  assert.strictEqual(classifyRoleFamily(title).primary, "SOFTWARE_ENGINEERING");
+});
+
+test("REGRESSION: Office Assistant + CMS company context -> OTHER", () => {
+  const title = "Remote Office Assistant";
+  const desc = "Manage office scheduling, correspondence, and documentation. Coalition Technologies builds custom CMS and WordPress websites for global clients.";
+  const domains = extractDomainMatches(title, desc, ["Administration"]);
+
+  assert.strictEqual(domains.length, 1);
+  assert.strictEqual(domains[0].domain, "OTHER");
+  assert.strictEqual(domains.some((d) => d.domain === "CMS" || d.domain === "FRONTEND" || d.domain === "CLIENT_CONSULTING"), false);
+  assert.strictEqual(classifyRoleFamily(title).primary, "OTHER");
+});
+
+test("REGRESSION: Frontend Web Application Developer -> FRONTEND", () => {
+  const title = "Frontend Web Application Developer";
+  const desc = "Develop interactive web applications using modern JavaScript and TypeScript.";
+  const domains = extractDomainMatches(title, desc, ["JavaScript", "TypeScript"]);
+
+  assert.ok(domains.some((d) => d.domain === "FRONTEND" && d.matched), "Must match FRONTEND");
+  const frontDetail = domains.find((d) => d.domain === "FRONTEND");
+  assert.strictEqual(frontDetail?.source, "title");
+  assert.strictEqual(classifyRoleFamily(title).primary, "SENIOR_FRONTEND_ENGINEER");
+});
+
+test("REGRESSION: Senior Shopify Developer + Next.js + Contentful -> COMMERCE + FRONTEND + CMS", () => {
+  const title = "Senior Shopify Developer";
+  const desc = "Building custom Shopify Plus storefronts using Hydrogen, Next.js, and Contentful headless CMS.";
+  const domains = extractDomainMatches(title, desc, ["Shopify", "Next.js", "Contentful"]);
+
+  assert.ok(domains.some((d) => d.domain === "COMMERCE" && d.matched), "Must match COMMERCE");
+  assert.ok(domains.some((d) => d.domain === "FRONTEND" && d.matched), "Must match FRONTEND");
+  assert.ok(domains.some((d) => d.domain === "CMS" && d.matched), "Must match CMS");
+});
+
+test("REGRESSION: Solutions Architect + customer implementation -> SOLUTIONS_ARCHITECTURE + CLIENT_CONSULTING / PROFESSIONAL_SERVICES", () => {
+  const title = "Solutions Architect";
+  const desc = "Lead technical solution design, pre-sales architecture, and customer implementation consulting for enterprise clients.";
+  const domains = extractDomainMatches(title, desc, []);
+
+  assert.ok(domains.some((d) => d.domain === "SOLUTIONS_ARCHITECTURE" && d.matched), "Must match SOLUTIONS_ARCHITECTURE");
+  assert.ok(domains.some((d) => d.domain === "PROFESSIONAL_SERVICES" && d.matched), "Must match PROFESSIONAL_SERVICES");
+  assert.ok(domains.some((d) => d.domain === "CLIENT_CONSULTING" && d.matched), "Must match CLIENT_CONSULTING");
+});
+
+test("REGRESSION: Technical Architect + MuleSoft -> TECHNICAL_ARCHITECTURE + ENTERPRISE_INTEGRATION", () => {
+  const title = "Technical Architect";
+  const desc = "Own the technical architecture and lead enterprise integration using MuleSoft APIs.";
+  const domains = extractDomainMatches(title, desc, ["MuleSoft"]);
+
+  assert.ok(domains.some((d) => d.domain === "TECHNICAL_ARCHITECTURE" && d.matched), "Must match TECHNICAL_ARCHITECTURE");
+  assert.ok(domains.some((d) => d.domain === "ENTERPRISE_INTEGRATION" && d.matched), "Must match ENTERPRISE_INTEGRATION");
+});
+
+
 

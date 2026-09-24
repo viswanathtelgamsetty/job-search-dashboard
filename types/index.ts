@@ -73,6 +73,8 @@ export type RoleFamily =
   | "CMS_DIGITAL_EXPERIENCE"
   | "COMMERCE"
   | "ENTERPRISE_INTEGRATION"
+  | "DATA_AI"
+  | "SOFTWARE_ENGINEERING"
   | "OTHER";
 
 export type SeniorityLevel =
@@ -121,10 +123,13 @@ export type CareerDomain =
   | "SECURITY"
   | "OTHER";
 
+export type DomainEvidenceSource = "title" | "description" | "skills" | "metadata";
+
 export interface DomainMatchDetail {
   domain: CareerDomain;
   matched: boolean;
   evidence: string | null;
+  source?: DomainEvidenceSource;
 }
 
 export type FitStrength = "STRONG" | "MODERATE" | "WEAK" | "NONE";
