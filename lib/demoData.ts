@@ -1,13 +1,14 @@
 import type { Job } from "@/types";
 import { evaluateJobMatch } from "./matchingEngine";
+import { classifyLocation } from "./locationClassifier";
 import { defaultSearchProfile } from "@/config/defaultProfile";
 
-const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedCompany">> = [
+const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedCompany" | "normalizedLocation">> = [
   {
     id: "demo-job-001",
     title: "Senior Technical Lead - Digital Experience & Headless",
     company: "EPAM Systems (Demo)",
-    location: "Hyderabad / Remote India",
+    location: "Hyderabad, India",
     remoteType: "HYBRID",
     salaryMin: 3800000,
     salaryMax: 4800000,
@@ -20,10 +21,11 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
     skills: ["React", "Next.js", "TypeScript", "Contentful", "Headless CMS", "GraphQL"],
     roleFamily: "Senior Technical Lead",
     travel: {
-      type: "INTERNATIONAL",
+      type: "INTERNATIONAL_TRAVEL",
       percentage: 20,
       percentageRange: "10-20%",
       destinations: ["USA", "Europe"],
+      evidence: "International travel required (15-20%) for client workshops in USA & Switzerland.",
       notes: "International travel required (15-20%) for client workshops in USA & Switzerland.",
       rawMention: "20% international travel to US client sites",
     },
@@ -54,10 +56,11 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
     skills: ["React", "TypeScript", "Next.js", "Frontend architecture", "Commerce integrations"],
     roleFamily: "Frontend Architect",
     travel: {
-      type: "INTERNATIONAL",
+      type: "INTERNATIONAL_TRAVEL",
       percentage: 25,
       percentageRange: "20-30%",
       destinations: ["Middle East", "Europe"],
+      evidence: "International project travel to Dubai and London customer headquarters up to 25%.",
       notes: "International project travel to Dubai and London customer headquarters.",
       rawMention: "25% travel to Middle East & UK",
     },
@@ -75,7 +78,7 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
     id: "demo-job-003",
     title: "Solutions Architect - Modern Web & Headless CMS",
     company: "Thoughtworks (Demo)",
-    location: "Remote from India",
+    location: "Remote India",
     remoteType: "REMOTE",
     salaryMin: 4000000,
     salaryMax: 5000000,
@@ -88,10 +91,11 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
     skills: ["React", "Angular", "TypeScript", "Contentful", "Design Systems", "Node.js"],
     roleFamily: "Solutions Architect",
     travel: {
-      type: "CLIENT_SITE",
+      type: "CLIENT_SITE_TRAVEL",
       percentage: 15,
       percentageRange: "10-20%",
       destinations: ["Singapore", "Australia"],
+      evidence: "Client-site travel for quarterly architecture review sprints in Singapore (15%).",
       notes: "Client-site travel for quarterly architecture review sprints in Singapore.",
       rawMention: "Quarterly travel to Singapore",
     },
@@ -124,10 +128,11 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
     skills: ["Contentful", "Headless CMS", "React", "Next.js", "Commerce integrations"],
     roleFamily: "CMS / Digital Experience Consultant",
     travel: {
-      type: "INTERNATIONAL",
+      type: "INTERNATIONAL_TRAVEL",
       percentage: 20,
       percentageRange: "10-20%",
       destinations: ["Europe", "USA"],
+      evidence: "Global customer implementation travel to Frankfurt & New York (20% travel).",
       notes: "Global customer implementation travel to Frankfurt & New York.",
     },
     description:
@@ -147,23 +152,24 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
     id: "demo-job-005",
     title: "Technical Consultant / Implementation Specialist",
     company: "Slalom (Demo)",
-    location: "International Remote / India",
+    location: "Remote India",
     remoteType: "REMOTE",
     salaryMin: undefined,
     salaryMax: undefined,
     currency: "INR",
     salaryLpaMin: undefined,
     salaryLpaMax: undefined,
-    salaryDisclosed: false, // Disclosed = false: should be surfaced per rule: "never reject solely because salary is unknown"
+    salaryDisclosed: false,
     experienceMin: 12,
     experienceMax: 17,
     skills: ["TypeScript", "React", "Angular", "Enterprise Integration Consultant", "AWS"],
     roleFamily: "Technical Consultant",
     travel: {
-      type: "CLIENT_SITE",
+      type: "CLIENT_SITE_TRAVEL",
       percentage: 15,
       percentageRange: "10-20%",
       destinations: ["USA"],
+      evidence: "Periodic client site visits for discovery phases (approx 15%).",
       notes: "Client site visits for discovery phases.",
     },
     description:
@@ -181,6 +187,7 @@ const rawDemoJobs: Array<Omit<Job, "match" | "normalizedTitle" | "normalizedComp
 export const demoSeedJobs: Job[] = rawDemoJobs.map((raw) => {
   const normTitle = raw.title.toLowerCase().replace(/[^a-z0-9]/g, "");
   const normComp = raw.company.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalizedLocation = classifyLocation(raw.location, raw.remoteType);
   const match = evaluateJobMatch(
     {
       title: raw.title,
@@ -205,6 +212,7 @@ export const demoSeedJobs: Job[] = rawDemoJobs.map((raw) => {
     ...raw,
     normalizedTitle: normTitle,
     normalizedCompany: normComp,
+    normalizedLocation,
     match,
   };
 });

@@ -137,11 +137,13 @@ export function JobFilters({
           onClick={() =>
             update({
               travelType:
-                filters.travelType === "INTERNATIONAL" ? "ALL" : "INTERNATIONAL",
+                filters.travelType === "INTERNATIONAL_TRAVEL" || filters.travelType === "INTERNATIONAL"
+                  ? "ALL"
+                  : "INTERNATIONAL_TRAVEL",
             })
           }
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-            filters.travelType === "INTERNATIONAL"
+            filters.travelType === "INTERNATIONAL_TRAVEL" || filters.travelType === "INTERNATIONAL"
               ? "border-indigo-500 bg-indigo-500/20 text-indigo-300 shadow-sm shadow-indigo-950"
               : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
           }`}
@@ -154,11 +156,13 @@ export function JobFilters({
           onClick={() =>
             update({
               travelType:
-                filters.travelType === "CLIENT_SITE" ? "ALL" : "CLIENT_SITE",
+                filters.travelType === "CLIENT_SITE_TRAVEL" || filters.travelType === "CLIENT_SITE"
+                  ? "ALL"
+                  : "CLIENT_SITE_TRAVEL",
             })
           }
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-            filters.travelType === "CLIENT_SITE"
+            filters.travelType === "CLIENT_SITE_TRAVEL" || filters.travelType === "CLIENT_SITE"
               ? "border-cyan-500 bg-cyan-500/20 text-cyan-300"
               : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
           }`}
@@ -199,9 +203,12 @@ export function JobFilters({
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
             <option value="ALL">All Locations</option>
-            <option value="HYDERABAD">Hyderabad</option>
-            <option value="INDIA">India (Any City)</option>
-            <option value="REMOTE">Remote / Worldwide</option>
+            <option value="HYDERABAD">Hyderabad (Target City)</option>
+            <option value="BANGALORE">Bangalore / Bengaluru</option>
+            <option value="PUNE">Pune</option>
+            <option value="INDIA">All India (Metro & Remote)</option>
+            <option value="REMOTE_INDIA">Remote from India</option>
+            <option value="REMOTE_GLOBAL">Worldwide Remote</option>
           </select>
         </div>
 

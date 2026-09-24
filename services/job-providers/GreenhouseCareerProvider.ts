@@ -19,8 +19,15 @@ export class GreenhouseCareerProvider implements JobProvider {
   readonly name = "Company Career Boards (Greenhouse)";
   readonly isConfigured = true;
 
-  // Board tokens of companies relevant to digital experience, headless CMS, and technical consulting
+  // Premier tech employers with official Greenhouse public boards that have major Hyderabad & India hubs
   private readonly defaultBoards = [
+    { token: "highradius", name: "HighRadius", industry: "Enterprise SaaS & AI (Hyderabad Hub)" },
+    { token: "deliveroo", name: "Deliveroo", industry: "Global Platform Engineering (Hyderabad Hub)" },
+    { token: "thoughtworks", name: "Thoughtworks", industry: "Global Technology Consultancy (India)" },
+    { token: "elastic", name: "Elastic", industry: "Search & Observability Architecture (India)" },
+    { token: "mongodb", name: "MongoDB", industry: "Modern Data Platform & Solutions Architecture" },
+    { token: "okta", name: "Okta", industry: "Cloud Security & Identity (India & Remote)" },
+    { token: "toast", name: "Toast", industry: "Restaurant Tech & Commerce (India Hub)" },
     { token: "contentful", name: "Contentful", industry: "Headless CMS Platform" },
     { token: "slalom", name: "Slalom Build", industry: "Modern Tech Consulting" },
     { token: "automattic", name: "Automattic", industry: "Digital Publishing & Experience" },
@@ -73,14 +80,27 @@ export class GreenhouseCareerProvider implements JobProvider {
           "experience",
           "react",
           "partner",
+          "staff",
+          "director",
+          "advisor",
         ];
 
+        // Match jobs that either:
+        // 1. Have target seniority/architect/lead keywords in title
+        // 2. Are in Hyderabad or India with tech/software/builder roles
         const matched = data.jobs.filter((j) => {
           const t = j.title.toLowerCase();
-          return targetKeywords.some((kw) => t.includes(kw));
+          const loc = (j.location?.name || "").toLowerCase();
+          const hasKeyword = targetKeywords.some((kw) => t.includes(kw));
+          const isIndiaOrHyd = /india|hyderabad|bengaluru|bangalore|pune|mumbai|chennai|delhi|gurgaon|noida/i.test(loc);
+
+          if (isIndiaOrHyd && hasKeyword) return true;
+          if (hasKeyword && (loc.includes("remote") || loc.includes("worldwide") || !loc)) return true;
+          if (isIndiaOrHyd && /builder|developer|engineer|manager/i.test(t)) return true;
+          return false;
         });
 
-        for (const job of matched.slice(0, 10)) {
+        for (const job of matched.slice(0, 15)) {
           const locationName = job.location?.name || "Global / Remote";
           const isRemote =
             /remote/i.test(locationName) || /anywhere/i.test(locationName);
@@ -89,8 +109,10 @@ export class GreenhouseCareerProvider implements JobProvider {
           let roleFamily = "Senior Technical Lead";
           if (/architect/i.test(job.title)) {
             roleFamily = "Solutions Architect";
-          } else if (/consultant|partner/i.test(job.title)) {
+          } else if (/consultant|advisor|partner/i.test(job.title)) {
             roleFamily = "Technical Consultant";
+          } else if (/frontend|ui|web/i.test(job.title)) {
+            roleFamily = "Frontend Architect";
           }
 
           results.push({
@@ -103,14 +125,14 @@ export class GreenhouseCareerProvider implements JobProvider {
               "React",
               "TypeScript",
               board.name.includes("Contentful") ? "Contentful" : "Architecture",
-              "Headless CMS",
+              "Enterprise Solutions",
             ],
             roleFamily,
             travelType: travel.type,
             travelPercentage: travel.percentage,
             travelDestinations: travel.destinations,
             travelNotes: travel.notes,
-            description: `${job.title} opportunity directly discovered on official ${board.name} Careers board.`,
+            description: `${job.title} opportunity directly discovered on official ${board.name} Careers board (${locationName}).`,
             source: `${board.name} Careers`,
             url: job.absolute_url,
             postedAt: job.updated_at,

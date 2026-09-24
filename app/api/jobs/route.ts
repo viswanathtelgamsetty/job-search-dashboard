@@ -4,6 +4,7 @@ import { evaluateJobMatch } from "@/lib/matchingEngine";
 import { extractTravelDetails } from "@/lib/travelExtractor";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
 import { defaultSearchProfile } from "@/config/defaultProfile";
+import { classifyLocation } from "@/lib/locationClassifier";
 import type { Job } from "@/types";
 
 export async function GET(request: Request) {
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
       company,
       normalizedCompany: company.toLowerCase().replace(/[^a-z0-9]/g, ""),
       location,
+      normalizedLocation: classifyLocation(location, body.remoteType),
       remoteType: body.remoteType || "REMOTE",
       salaryMin: parsedSalary.min,
       salaryMax: parsedSalary.max,

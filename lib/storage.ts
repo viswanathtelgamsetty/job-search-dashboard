@@ -189,7 +189,7 @@ export function calculateDashboardStats(jobs: Job[]): DashboardStats {
       addedThisWeek++;
     }
 
-    if (job.travel.type === "INTERNATIONAL") {
+    if (job.travel.type === "INTERNATIONAL_TRAVEL") {
       internationalTravelCount++;
     }
 

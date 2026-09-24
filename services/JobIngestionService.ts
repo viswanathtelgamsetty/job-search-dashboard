@@ -1,14 +1,21 @@
-import type { Job, ProviderStatus, SearchProfile } from "@/types";
+import type {
+  Job,
+  MarketScanMetrics,
+  ProviderStatus,
+  SearchProfile,
+} from "@/types";
 import {
   AdzunaJobProvider,
   ArbeitnowJobProvider,
   GreenhouseCareerProvider,
+  JobicyJobProvider,
   RemotiveJobProvider,
   type DiscoveredJobRaw,
   type JobProvider,
 } from "./job-providers";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
 import { extractTravelDetails } from "@/lib/travelExtractor";
+import { classifyLocation } from "@/lib/locationClassifier";
 import { evaluateJobMatch } from "@/lib/matchingEngine";
 import { deduplicateJobs, normalizeCompanyName, normalizeJobTitle } from "@/lib/deduplication";
 import { defaultSearchProfile } from "@/config/defaultProfile";
@@ -21,6 +28,7 @@ export class JobIngestionService {
       new RemotiveJobProvider(),
       new ArbeitnowJobProvider(),
       new GreenhouseCareerProvider(),
+      new JobicyJobProvider(),
       new AdzunaJobProvider(),
     ];
   }
@@ -33,28 +41,13 @@ export class JobIngestionService {
     totalIngested: number;
     allJobs: Job[];
     providers: ProviderStatus[];
+    metrics: MarketScanMetrics;
   }> {
     const providerStatuses: ProviderStatus[] = [];
     const discoveredJobs: Job[] = [];
+    const providersQueried: Record<string, number> = {};
 
-    // Query each provider individually so errors are explicitly captured
     for (const provider of this.providers) {
-      const isEnabled = profile.enabledProviders
-        ? profile.enabledProviders.includes(provider.id)
-        : true;
-
-      if (!isEnabled) {
-        providerStatuses.push({
-          id: provider.id,
-          name: provider.name,
-          enabled: false,
-          success: false,
-          jobsReturned: 0,
-          details: "Disabled by user search configuration",
-        });
-        continue;
-      }
-
       if (!provider.isConfigured) {
         providerStatuses.push({
           id: provider.id,
@@ -64,9 +57,10 @@ export class JobIngestionService {
           jobsReturned: 0,
           details:
             provider.id === "adzuna"
-              ? "Disabled: ADZUNA_APP_ID and ADZUNA_APP_KEY credentials required in .env"
-              : "Provider credentials not configured",
+              ? "DISABLED — credentials required (ADZUNA_APP_ID and ADZUNA_APP_KEY in .env)"
+              : "DISABLED — credentials required",
         });
+        providersQueried[provider.name] = 0;
         continue;
       }
 
@@ -79,6 +73,7 @@ export class JobIngestionService {
         const rawResults: DiscoveredJobRaw[] = await provider.searchJobs({
           keywords: profile.targetSkills,
           roleFamilies: profile.targetRoleFamilies,
+          locations: profile.targetLocations,
         });
 
         providerStatuses.push({
@@ -90,6 +85,8 @@ export class JobIngestionService {
           boardsQueried,
           details: `Successfully fetched ${rawResults.length} live vacancies`,
         });
+
+        providersQueried[provider.name] = rawResults.length;
 
         for (const raw of rawResults) {
           const parsedSalary = parseAndNormalizeSalary(
@@ -107,6 +104,8 @@ export class JobIngestionService {
               notes: raw.travelNotes,
             }
           );
+
+          const normalizedLocation = classifyLocation(raw.location, raw.remoteType);
 
           const match = evaluateJobMatch(
             {
@@ -135,6 +134,7 @@ export class JobIngestionService {
             company: raw.company,
             normalizedCompany: normalizeCompanyName(raw.company),
             location: raw.location,
+            normalizedLocation,
             remoteType: raw.remoteType,
             salaryMin: parsedSalary.min,
             salaryMax: parsedSalary.max,
@@ -173,21 +173,89 @@ export class JobIngestionService {
           boardsQueried,
           details: `Error encountered: ${errorMsg}`,
         });
+        providersQueried[provider.name] = 0;
       }
     }
 
-    // Merge discovered jobs with existing jobs, and run deduplication
+    const rawJobsCount = discoveredJobs.length;
     const combined = [...discoveredJobs, ...existingJobs];
     const deduplicated = deduplicateJobs(combined);
+    const duplicatesCount = Math.max(0, combined.length - deduplicated.length);
+    const finalJobsCount = deduplicated.length;
 
     const existingIds = new Set(existingJobs.map((j) => j.id));
     const newlyAdded = deduplicated.filter((j) => !existingIds.has(j.id) && !j.isDemo);
 
+    // Calculate Market Coverage Metrics across the deduplicated jobs
+    const locationBreakdown = {
+      hyderabad: 0,
+      india: 0,
+      remoteIndia: 0,
+      remoteGlobal: 0,
+      international: 0,
+    };
+
+    const travelBreakdown = {
+      internationalTravel: 0,
+      clientSiteTravel: 0,
+      internationalTeamOnly: 0,
+      noTravelMentioned: 0,
+      relocation: 0,
+    };
+
+    for (const j of deduplicated) {
+      if (j.normalizedLocation === "HYDERABAD") {
+        locationBreakdown.hyderabad++;
+        locationBreakdown.india++;
+      } else if (
+        [
+          "BANGALORE",
+          "PUNE",
+          "CHENNAI",
+          "MUMBAI",
+          "DELHI_NCR",
+          "INDIA_OTHER",
+          "REMOTE_INDIA",
+        ].includes(j.normalizedLocation)
+      ) {
+        locationBreakdown.india++;
+        if (j.normalizedLocation === "REMOTE_INDIA") {
+          locationBreakdown.remoteIndia++;
+        }
+      } else if (j.normalizedLocation === "REMOTE_GLOBAL") {
+        locationBreakdown.remoteGlobal++;
+      } else {
+        locationBreakdown.international++;
+      }
+
+      if (j.travel.type === "INTERNATIONAL_TRAVEL") {
+        travelBreakdown.internationalTravel++;
+      } else if (j.travel.type === "CLIENT_SITE_TRAVEL") {
+        travelBreakdown.clientSiteTravel++;
+      } else if (j.travel.type === "INTERNATIONAL_TEAM_ONLY") {
+        travelBreakdown.internationalTeamOnly++;
+      } else if (j.travel.type === "RELOCATION") {
+        travelBreakdown.relocation++;
+      } else {
+        travelBreakdown.noTravelMentioned++;
+      }
+    }
+
+    const metrics: MarketScanMetrics = {
+      providersQueried,
+      rawJobsCount,
+      duplicatesCount,
+      finalJobsCount,
+      locationBreakdown,
+      travelBreakdown,
+    };
+
     return {
       newJobs: newlyAdded,
-      totalIngested: discoveredJobs.length,
+      totalIngested: rawJobsCount,
       allJobs: deduplicated,
       providers: providerStatuses,
+      metrics,
     };
   }
 }

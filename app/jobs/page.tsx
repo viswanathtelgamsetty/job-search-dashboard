@@ -93,28 +93,41 @@ export default function MarketRadarPage() {
           if (!matchesSearch) return false;
         }
 
-        // Location Filter
+        // Location Filter using normalizedLocation
         if (filters.location !== "ALL") {
-          const loc = job.location.toLowerCase();
-          if (filters.location === "HYDERABAD" && !loc.includes("hyderabad")) {
-            return false;
-          }
-          if (
-            filters.location === "INDIA" &&
-            !loc.includes("india") &&
-            !loc.includes("hyderabad") &&
-            !loc.includes("bengaluru") &&
-            !loc.includes("bangalore") &&
-            !loc.includes("pune")
-          ) {
-            return false;
-          }
-          if (
-            filters.location === "REMOTE" &&
-            job.remoteType !== "REMOTE" &&
-            !loc.includes("remote")
-          ) {
-            return false;
+          if (filters.location === "HYDERABAD") {
+            if (job.normalizedLocation !== "HYDERABAD") return false;
+          } else if (filters.location === "BANGALORE") {
+            if (job.normalizedLocation !== "BANGALORE") return false;
+          } else if (filters.location === "PUNE") {
+            if (job.normalizedLocation !== "PUNE") return false;
+          } else if (filters.location === "INDIA") {
+            if (
+              ![
+                "HYDERABAD",
+                "BANGALORE",
+                "PUNE",
+                "CHENNAI",
+                "MUMBAI",
+                "DELHI_NCR",
+                "INDIA_OTHER",
+                "REMOTE_INDIA",
+              ].includes(job.normalizedLocation)
+            ) {
+              return false;
+            }
+          } else if (filters.location === "REMOTE_INDIA") {
+            if (job.normalizedLocation !== "REMOTE_INDIA") return false;
+          } else if (filters.location === "REMOTE_GLOBAL") {
+            if (job.normalizedLocation !== "REMOTE_GLOBAL") return false;
+          } else if (filters.location === "REMOTE") {
+            if (
+              job.remoteType !== "REMOTE" &&
+              job.normalizedLocation !== "REMOTE_GLOBAL" &&
+              job.normalizedLocation !== "REMOTE_INDIA"
+            ) {
+              return false;
+            }
           }
         }
 
@@ -136,9 +149,21 @@ export default function MarketRadarPage() {
           if (job.roleFamily !== filters.roleFamily) return false;
         }
 
-        // Travel Type
+        // Travel Type Filter using strict categories
         if (filters.travelType !== "ALL") {
-          if (job.travel.type !== filters.travelType) return false;
+          if (
+            filters.travelType === "INTERNATIONAL_TRAVEL" ||
+            filters.travelType === "INTERNATIONAL"
+          ) {
+            if (job.travel.type !== "INTERNATIONAL_TRAVEL") return false;
+          } else if (
+            filters.travelType === "CLIENT_SITE_TRAVEL" ||
+            filters.travelType === "CLIENT_SITE"
+          ) {
+            if (job.travel.type !== "CLIENT_SITE_TRAVEL") return false;
+          } else if (job.travel.type !== filters.travelType) {
+            return false;
+          }
         }
 
         // Source
@@ -170,15 +195,15 @@ export default function MarketRadarPage() {
         }
         if (filters.sortBy === "travel") {
           const aTravelVal =
-            a.travel.type === "INTERNATIONAL"
+            a.travel.type === "INTERNATIONAL_TRAVEL"
               ? 3
-              : a.travel.type === "CLIENT_SITE"
+              : a.travel.type === "CLIENT_SITE_TRAVEL"
               ? 2
               : 1;
           const bTravelVal =
-            b.travel.type === "INTERNATIONAL"
+            b.travel.type === "INTERNATIONAL_TRAVEL"
               ? 3
-              : b.travel.type === "CLIENT_SITE"
+              : b.travel.type === "CLIENT_SITE_TRAVEL"
               ? 2
               : 1;
           return bTravelVal - aTravelVal;

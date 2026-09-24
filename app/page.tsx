@@ -72,8 +72,8 @@ export default function DashboardPage() {
     .filter((j) => j.status === "DISCOVERED" || j.status === "SAVED")
     .sort((a, b) => {
       // Prioritize international travel + match score
-      const aScore = (a.match?.overallScore || 0) + (a.travel.type === "INTERNATIONAL" ? 15 : 0);
-      const bScore = (b.match?.overallScore || 0) + (b.travel.type === "INTERNATIONAL" ? 15 : 0);
+      const aScore = (a.match?.overallScore || 0) + (a.travel.type === "INTERNATIONAL_TRAVEL" ? 15 : 0);
+      const bScore = (b.match?.overallScore || 0) + (b.travel.type === "INTERNATIONAL_TRAVEL" ? 15 : 0);
       return bScore - aScore;
     })
     .slice(0, 3);

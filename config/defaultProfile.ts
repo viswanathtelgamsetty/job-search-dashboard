@@ -41,9 +41,8 @@ export const defaultSearchProfile: SearchProfile = {
     "Design Systems",
   ],
   preferredTravelTypes: [
-    "INTERNATIONAL",
-    "CLIENT_SITE",
-    "OCCASIONAL",
+    "INTERNATIONAL_TRAVEL",
+    "CLIENT_SITE_TRAVEL",
     "RELOCATION",
   ],
   preferredTravelDestinations: [
@@ -56,5 +55,5 @@ export const defaultSearchProfile: SearchProfile = {
     "UAE",
   ],
   preferredRemoteTypes: ["REMOTE", "HYBRID"],
-  enabledProviders: ["remotive", "arbeitnow", "greenhouse", "adzuna"],
+  enabledProviders: ["remotive", "arbeitnow", "greenhouse", "jobicy", "adzuna"],
 };

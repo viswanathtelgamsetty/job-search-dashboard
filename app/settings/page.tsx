@@ -236,9 +236,9 @@ export default function SettingsPage() {
           <div className="flex flex-wrap gap-2 text-xs">
             {(
               [
-                { id: "INTERNATIONAL", label: "International Travel" },
-                { id: "CLIENT_SITE", label: "Client-Site Travel (10–30%)" },
-                { id: "OCCASIONAL", label: "Occasional Workshop Travel" },
+                { id: "INTERNATIONAL_TRAVEL", label: "International Travel" },
+                { id: "CLIENT_SITE_TRAVEL", label: "Client-Site Travel (10–30%)" },
+                { id: "REMOTE_GLOBAL", label: "Remote Global" },
                 { id: "RELOCATION", label: "Relocation Required / Global Mobility" },
               ] as const
             ).map((t) => (

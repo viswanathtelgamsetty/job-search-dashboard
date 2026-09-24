@@ -34,10 +34,12 @@ export class AdzunaJobProvider implements JobProvider {
     const appId = process.env.ADZUNA_APP_ID;
     const appKey = process.env.ADZUNA_APP_KEY;
     const country = process.env.ADZUNA_COUNTRY || "in"; // default to India
+    const location = process.env.ADZUNA_LOCATION || (_criteria.locations?.[0] || "Hyderabad");
 
     try {
       const query = encodeURIComponent("Technical Lead OR Frontend Architect OR Solutions Architect");
-      const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${appId}&app_key=${appKey}&what=${query}&content-type=application/json`;
+      const whereParam = encodeURIComponent(location);
+      const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${appId}&app_key=${appKey}&what=${query}&where=${whereParam}&content-type=application/json`;
 
       const response = await fetch(url, {
         headers: { Accept: "application/json" },

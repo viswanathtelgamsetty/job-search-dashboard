@@ -12,12 +12,29 @@ export type JobStatus =
 export type RemoteType = "REMOTE" | "HYBRID" | "ONSITE";
 
 export type TravelType =
-  | "INTERNATIONAL"
-  | "CLIENT_SITE"
-  | "OCCASIONAL"
+  | "INTERNATIONAL_TRAVEL"
+  | "CLIENT_SITE_TRAVEL"
+  | "INTERNATIONAL_TEAM_ONLY"
+  | "REMOTE_GLOBAL"
   | "RELOCATION"
-  | "NONE"
+  | "NO_TRAVEL_MENTIONED"
   | "UNKNOWN";
+
+export type NormalizedLocation =
+  | "HYDERABAD"
+  | "BANGALORE"
+  | "PUNE"
+  | "CHENNAI"
+  | "MUMBAI"
+  | "DELHI_NCR"
+  | "INDIA_OTHER"
+  | "REMOTE_INDIA"
+  | "REMOTE_GLOBAL"
+  | "USA"
+  | "EUROPE"
+  | "MIDDLE_EAST"
+  | "SINGAPORE"
+  | "OTHER";
 
 export type TravelPercentageRange =
   | "10-20%"
@@ -31,6 +48,7 @@ export interface TravelDetails {
   percentage?: number;
   percentageRange?: TravelPercentageRange;
   destinations: string[];
+  evidence: string;
   rawMention?: string;
   notes?: string;
 }
@@ -63,6 +81,7 @@ export interface Job {
   company: string;
   normalizedCompany: string;
   location: string;
+  normalizedLocation: NormalizedLocation;
   remoteType: RemoteType;
 
   // Compensation
@@ -156,6 +175,27 @@ export interface ProviderStatus {
   error?: string;
   details?: string;
   boardsQueried?: string[];
+}
+
+export interface MarketScanMetrics {
+  providersQueried: Record<string, number>;
+  rawJobsCount: number;
+  duplicatesCount: number;
+  finalJobsCount: number;
+  locationBreakdown: {
+    hyderabad: number;
+    india: number;
+    remoteIndia: number;
+    remoteGlobal: number;
+    international: number;
+  };
+  travelBreakdown: {
+    internationalTravel: number;
+    clientSiteTravel: number;
+    internationalTeamOnly: number;
+    noTravelMentioned: number;
+    relocation: number;
+  };
 }
 
 export interface JobFiltersState {

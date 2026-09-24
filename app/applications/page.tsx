@@ -131,7 +131,7 @@ export default function ApplicationsPage() {
                           💰 ₹{job.salaryLpaMin}L+
                         </span>
                       )}
-                      {job.travel.type === "INTERNATIONAL" && (
+                      {job.travel.type === "INTERNATIONAL_TRAVEL" && (
                         <span className="rounded bg-indigo-950 text-indigo-300 border border-indigo-800/70 px-2 py-0.5 font-medium">
                           ✈️ Intl Travel
                         </span>

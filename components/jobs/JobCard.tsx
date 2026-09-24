@@ -30,10 +30,6 @@ export function JobCard({
     }
   }
 
-  // Travel badge style
-  const isInternational = job.travel.type === "INTERNATIONAL";
-  const isClientSite = job.travel.type === "CLIENT_SITE";
-  const isOccasional = job.travel.type === "OCCASIONAL";
 
   // Experience presentation
   const expText =
@@ -154,27 +150,43 @@ export function JobCard({
               ⏳ {expText}
             </span>
 
-            {/* Travel Requirement */}
+            {/* Travel Requirement Badge */}
             <span
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium border ${
-                isInternational
-                  ? "bg-indigo-950/70 text-indigo-300 border-indigo-700/60 animate-pulse"
-                  : isClientSite
-                  ? "bg-cyan-950/70 text-cyan-300 border-cyan-700/60"
-                  : isOccasional
-                  ? "bg-slate-800/70 text-slate-300 border-slate-700"
+                job.travel.type === "INTERNATIONAL_TRAVEL"
+                  ? "bg-indigo-950/90 text-indigo-300 border-indigo-700/80 animate-pulse font-bold"
+                  : job.travel.type === "CLIENT_SITE_TRAVEL"
+                  ? "bg-cyan-950/80 text-cyan-300 border-cyan-700/80 font-bold"
+                  : job.travel.type === "INTERNATIONAL_TEAM_ONLY"
+                  ? "bg-sky-950/70 text-sky-300 border-sky-800/60"
+                  : job.travel.type === "RELOCATION"
+                  ? "bg-rose-950/70 text-rose-300 border-rose-800/60"
                   : "bg-slate-900 text-slate-400 border-slate-800"
               }`}
             >
-              ✈️ {job.travel.notes || `${job.travel.type} Travel`}
-              {job.travel.percentage && ` (${job.travel.percentage}%)`}
+              {job.travel.type === "INTERNATIONAL_TRAVEL" && "✈️ International Travel"}
+              {job.travel.type === "CLIENT_SITE_TRAVEL" && "🏢 Client-Site Travel"}
+              {job.travel.type === "INTERNATIONAL_TEAM_ONLY" && "🌐 International Team Only"}
+              {job.travel.type === "RELOCATION" && "🌍 Relocation Required"}
+              {job.travel.type === "REMOTE_GLOBAL" && "🌐 Global Remote"}
+              {job.travel.type === "NO_TRAVEL_MENTIONED" && "No Travel Mentioned"}
+              {job.travel.type === "UNKNOWN" && "Travel Unknown"}
+              {job.travel.percentage ? ` (${job.travel.percentage}%)` : ""}
             </span>
           </div>
+
+          {/* Travel Evidence Display */}
+          {job.travel.evidence && job.travel.type !== "NO_TRAVEL_MENTIONED" && (
+            <div className="rounded-lg bg-indigo-950/40 border border-indigo-900/60 px-3 py-1.5 text-xs text-indigo-200">
+              <span className="font-semibold text-indigo-400 mr-1.5">Travel Evidence:</span>
+              <span className="italic">&ldquo;{job.travel.evidence}&rdquo;</span>
+            </div>
+          )}
 
           {/* Travel Destinations if available */}
           {job.travel.destinations && job.travel.destinations.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-indigo-300">
-              <span className="font-semibold text-slate-400">Target Customer Sites:</span>
+              <span className="font-semibold text-slate-400">Target Destinations:</span>
               {job.travel.destinations.map((dest) => (
                 <span
                   key={dest}
