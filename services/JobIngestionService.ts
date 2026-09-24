@@ -332,7 +332,11 @@ export class JobIngestionService {
     }
 
     const rawJobsCount = discoveredJobs.length;
-    const combined = [...existingJobs, ...discoveredJobs];
+    // Strip any demo records from the existing job list — they must never re-enter allJobs
+    const cleanedExistingJobs = existingJobs.filter(
+      (j) => j.isDemo !== true && !j.id.startsWith("demo-") && !j.company.includes("(Demo)")
+    );
+    const combined = [...cleanedExistingJobs, ...discoveredJobs];
     const deduplicated = deduplicateJobs(combined);
     const duplicatesCount = Math.max(0, combined.length - deduplicated.length);
     const finalJobsCount = deduplicated.length;

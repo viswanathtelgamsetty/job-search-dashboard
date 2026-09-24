@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { demoSeedJobs } from "@/lib/demoData";
 import { evaluateJobMatch } from "@/lib/matchingEngine";
 import { extractTravelDetails } from "@/lib/travelExtractor";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
@@ -11,25 +10,36 @@ import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 import { calculateJobFreshness } from "@/lib/jobQuality";
 import type { Job } from "@/types";
 
+/**
+ * GET /api/jobs
+ *
+ * Returns an empty job list. Real jobs are fetched via POST /api/jobs/sync
+ * and persisted client-side in localStorage.
+ *
+ * Demo/sample fixtures are NEVER returned here to prevent demo records from
+ * contaminating the production job collection, metrics, or application queues.
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.toLowerCase();
 
-  let jobs = demoSeedJobs;
+  // Real production endpoint: no demo data is included here.
+  // The client populates jobs by calling POST /api/jobs/sync.
+  const jobs: Job[] = [];
 
-  if (search) {
-    jobs = jobs.filter(
-      (j) =>
-        j.title.toLowerCase().includes(search) ||
-        j.company.toLowerCase().includes(search) ||
-        j.skills.some((s) => s.toLowerCase().includes(search))
-    );
-  }
+  const filtered = search
+    ? jobs.filter(
+        (j) =>
+          j.title.toLowerCase().includes(search) ||
+          j.company.toLowerCase().includes(search) ||
+          j.skills.some((s) => s.toLowerCase().includes(search))
+      )
+    : jobs;
 
   return NextResponse.json({
     success: true,
-    count: jobs.length,
-    jobs,
+    count: filtered.length,
+    jobs: filtered,
   });
 }
 

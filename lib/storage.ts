@@ -5,7 +5,6 @@ import type {
   SearchProfile,
   TargetCompany,
 } from "@/types";
-import { demoSeedJobs } from "./demoData";
 import { defaultSearchProfile } from "@/config/defaultProfile";
 import { defaultTargetCompanies } from "@/config/defaultCompanies";
 import { deduplicateJobs } from "./deduplication";
@@ -15,33 +14,86 @@ const COMPANIES_STORAGE_KEY = "job-market-radar:companies:v1";
 const PROFILE_STORAGE_KEY = "job-market-radar:profile:v1";
 const LAST_SYNC_KEY = "job-market-radar:last-sync:v1";
 
+// In-memory fallback to survive QuotaExceededError and private browsing contexts.
+// Never seeded with demo data — starts empty so the sync flow populates real jobs.
+let inMemoryJobs: Job[] | null = null;
+
+/**
+ * Strip demo jobs from a collection.
+ * Guards against demo records persisted by older versions of the app.
+ */
+function stripDemoJobs(jobs: Job[]): Job[] {
+  return jobs.filter(
+    (j) =>
+      j.isDemo !== true &&
+      !j.id.startsWith("demo-") &&
+      !j.company.includes("(Demo)")
+  );
+}
+
 export function getStoredJobs(): Job[] {
-  if (typeof window === "undefined") {
-    return demoSeedJobs;
+  if (inMemoryJobs && inMemoryJobs.length > 0) {
+    return inMemoryJobs;
   }
 
-  const stored = localStorage.getItem(JOBS_STORAGE_KEY);
-  if (!stored) {
-    saveJobs(demoSeedJobs);
-    return demoSeedJobs;
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return inMemoryJobs || [];
   }
 
   try {
+    const stored = localStorage.getItem(JOBS_STORAGE_KEY);
+    if (!stored) {
+      inMemoryJobs = [];
+      return [];
+    }
+
     const parsed: Job[] = JSON.parse(stored);
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      saveJobs(demoSeedJobs);
-      return demoSeedJobs;
+      inMemoryJobs = [];
+      return [];
     }
-    return parsed;
+    // Filter out any demo records that may have been persisted by older versions
+    const real = stripDemoJobs(parsed);
+    inMemoryJobs = real;
+    // If stripping removed records, rewrite clean data to storage
+    if (real.length !== parsed.length) {
+      saveJobs(real);
+    }
+    return real;
   } catch {
-    saveJobs(demoSeedJobs);
-    return demoSeedJobs;
+    inMemoryJobs = [];
+    return [];
   }
 }
 
 export function saveJobs(jobs: Job[]) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(deduplicateJobs(jobs)));
+  // Strip demo records before persisting — they must NEVER enter production storage
+  const realOnly = stripDemoJobs(jobs);
+  const deduped = deduplicateJobs(realOnly);
+  inMemoryJobs = deduped;
+
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(deduped));
+  } catch {
+    // QuotaExceededError happens when storing hundreds of jobs with large raw descriptions
+    try {
+      // Compact jobs: truncate lengthy descriptions to 300 characters for localStorage caching
+      const compacted = deduped.map((j) => ({
+        ...j,
+        description:
+          j.description && j.description.length > 300
+            ? j.description.slice(0, 300) + "..."
+            : j.description,
+      }));
+      localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(compacted));
+    } catch (innerErr: unknown) {
+      // If quota is exhausted or storage is disabled, retain state in memory
+      console.warn("localStorage quota exceeded. Retaining jobs in memory session cache.", innerErr);
+    }
   }
 }
 
@@ -133,8 +185,12 @@ export function getStoredCompanies(): TargetCompany[] {
 }
 
 export function saveCompanies(companies: TargetCompany[]) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(COMPANIES_STORAGE_KEY, JSON.stringify(companies));
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(COMPANIES_STORAGE_KEY, JSON.stringify(companies));
+    } catch (e) {
+      console.warn("Failed to persist companies to localStorage:", e);
+    }
   }
 }
 
@@ -158,8 +214,12 @@ export function getStoredProfile(): SearchProfile {
 }
 
 export function saveProfile(profile: SearchProfile) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    } catch (e) {
+      console.warn("Failed to persist profile to localStorage:", e);
+    }
   }
 }
 
@@ -169,8 +229,12 @@ export function getLastSyncTime(): string | null {
 }
 
 export function setLastSyncTime(timestamp: string) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(LAST_SYNC_KEY, timestamp);
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(LAST_SYNC_KEY, timestamp);
+    } catch (e) {
+      console.warn("Failed to persist lastSyncTime to localStorage:", e);
+    }
   }
 }
 

@@ -246,7 +246,11 @@ export function evaluateJobMatch(
         ? `Seniority (${seniorityResult.level}) matches 12+ years Architect/Lead profile`
         : seniorityStrength === "MODERATE"
         ? `Senior engineering level with relevant domain depth`
-        : `Seniority level is ${seniorityResult.level}`,
+        : seniorityResult.level === "ENTRY"
+        ? `Seniority level is ENTRY — well below the 12+ years target seniority`
+        : seniorityResult.level === "MID"
+        ? `Seniority level is MID — below the 12+ years target seniority`
+        : `Seniority level is ${seniorityResult.level} (below target)`,
   };
 
   // =========================================================================
@@ -622,8 +626,16 @@ export function evaluateJobMatch(
   // =========================================================================
   const whyThisFits: string[] = [];
 
-  // Role alignment
-  if (roleTier === "TIER_1") {
+  // Role alignment — only emit senior/architect reason when seniority is appropriate
+  const isBelowTargetSeniority =
+    seniorityResult.level === "ENTRY" || seniorityResult.level === "MID";
+
+  if (isBelowTargetSeniority) {
+    // Never describe an ENTRY/MID job as "Core Target Architecture" or "Sr Frontend Engineer"
+    whyThisFits.push(
+      `! Role seniority is ${seniorityResult.level} (below 12+ years target)`
+    );
+  } else if (roleTier === "TIER_1") {
     whyThisFits.push(`✓ ${formatRoleFamily(roleClassification.primary)} role (Core Target Architecture)`);
   } else if (roleTier === "TIER_2") {
     whyThisFits.push(`✓ ${formatRoleFamily(roleClassification.primary)} role (Consulting / Solutions Engineering)`);
