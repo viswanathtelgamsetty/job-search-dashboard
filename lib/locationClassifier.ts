@@ -11,6 +11,10 @@ export function classifyLocation(
 ): NormalizedLocation {
   const loc = (locationStr || "").toLowerCase().trim();
 
+  if (!loc) {
+    return "UNKNOWN";
+  }
+
   // 1. Tech Metro Hubs in India
   if (
     /\b(hyderabad|secunderabad|telangana|hitec\s*city|gachibowli|madhapur|financial\s*district)\b/i.test(
@@ -48,7 +52,19 @@ export function classifyLocation(
     return "DELHI_NCR";
   }
 
-  // 2. Remote Global / Worldwide (Check before general India check)
+  // 2. Multi-Region Check (Requirement 1 & 2: Never infer USA from "Northern America, LATAM, Europe, APAC")
+  const regionMatches = [
+    /\b(northern america|north america|americas)\b/i.test(loc) || (/\b(usa|united states|canada)\b/i.test(loc) && /[,/|]/.test(loc)),
+    /\b(latam|latin america|south america|brazil|argentina)\b/i.test(loc),
+    /\b(emea|europe|european union|uk|germany|netherlands|france|spain)\b/i.test(loc),
+    /\b(apac|asia pacific|singapore|australia|japan)\b/i.test(loc),
+  ].filter(Boolean);
+
+  if (regionMatches.length >= 2 || /\b(multi[- ]region|multiple regions)\b/i.test(loc)) {
+    return "MULTI_REGION";
+  }
+
+  // 3. Remote Global / Worldwide (Check before general India check)
   if (
     /\b(anywhere\s+in\s+the\s+world|worldwide|global|all regions|international remote|remote - global|any location|global remote)\b/i.test(
       loc
@@ -57,7 +73,7 @@ export function classifyLocation(
     return "REMOTE_GLOBAL";
   }
 
-  // 3. India Remote vs Remote Global vs India Other
+  // 4. India Remote vs Remote Global vs India Other
   const isIndia = /\b(india)\b|[,/]\s*in\b/i.test(loc);
   const isRemote =
     remoteType === "REMOTE" ||
@@ -71,7 +87,7 @@ export function classifyLocation(
     return "INDIA_OTHER";
   }
 
-  // 4. International Geographies
+  // 5. International Geographies
   if (/\b(singapore)\b/i.test(loc)) {
     return "SINGAPORE";
   }
@@ -84,10 +100,12 @@ export function classifyLocation(
     return "MIDDLE_EAST";
   }
 
+  // Strict USA check: never infer USA from "Northern America" or "Americas"
   if (
-    /\b(usa|united states|u\.s\.|america|new york|california|san francisco|austin|seattle|chicago|boston)\b/i.test(
+    /\b(usa|united states|u\.s\.|u\.s\.a\.|new york|california|san francisco|austin|seattle|chicago|boston|los angeles|seattle|texas)\b/i.test(
       loc
-    )
+    ) &&
+    !/\b(northern america|north america|latin america|south america|americas)\b/i.test(loc)
   ) {
     return "USA";
   }
@@ -207,6 +225,8 @@ export function formatNormalizedLocation(loc: NormalizedLocation): string {
       return "Remote (India)";
     case "REMOTE_GLOBAL":
       return "Remote (Global)";
+    case "MULTI_REGION":
+      return "Multi-Region";
     case "USA":
       return "USA";
     case "EUROPE":
@@ -217,5 +237,7 @@ export function formatNormalizedLocation(loc: NormalizedLocation): string {
       return "Singapore";
     case "OTHER":
       return "Other Location";
+    case "UNKNOWN":
+      return "Unknown";
   }
 }

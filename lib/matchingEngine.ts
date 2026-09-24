@@ -16,8 +16,17 @@ import type {
 } from "@/types";
 import { matchesSalaryRequirement } from "./salaryParser.ts";
 import { classifyLocation, checkIndiaEligibility } from "./locationClassifier.ts";
-import { matchTargetTechnologies } from "./technologyMatcher.ts";
-import { classifyRoleFamily, formatRoleFamily } from "./roleClassifier.ts";
+import { extractTravelDetails } from "./travelExtractor.ts";
+import {
+  matchWeightedTechnologies,
+  PRIMARY_TARGET_TECHNOLOGIES,
+} from "./technologyMatcher.ts";
+import {
+  classifyRoleFamily,
+  classifyRoleTier,
+  formatRoleFamily,
+  formatRoleTier,
+} from "./roleClassifier.ts";
 import { detectSeniority } from "./seniorityDetector.ts";
 import { extractDomainMatches, formatDomainName } from "./domainMatcher.ts";
 
@@ -43,18 +52,7 @@ export interface JobForEvaluation {
 }
 
 /**
- * Phase 3.2 — Career Fit Model for 12+ Year Technical Lead / Architect Profile
- *
- * Core Principles:
- * 1. Evidence-Based Domain Matching: Evaluates domains (FRONTEND, CMS, COMMERCE, SOLUTIONS_ARCHITECTURE, etc.)
- *    based on actual job content.
- * 2. Multi-Dimensional Career Fit: Calculates roleFit, technologyFit, domainFit, seniorityFit,
- *    locationFit, remoteFit, travelFit, clientFacingFit, and freshnessFit independently.
- * 3. Broad Role Fit: Does not require "Architect" in title (e.g. Senior Shopify Developer with Next.js & Contentful
- *    has high fit).
- * 4. Travel as a Positive Signal: International or client-site travel acts as a positive bonus, never a blocker.
- * 5. Freshness Separated: Affects ordering, not career relevance.
- * 6. Transparent & Explainable Scoring: Documented component points instead of opaque probabilities.
+ * Phase 3.2 / 7.1 — Career Fit Model for 12+ Year Technical Lead / Architect Profile
  */
 export function evaluateJobMatch(
   job: JobForEvaluation,
@@ -125,112 +123,70 @@ export function evaluateJobMatch(
   };
 
   // =========================================================================
-  // 2. Evidence-Based Technology Matching
+  // 2. Evidence-Based Weighted Technology Matching (Requirement 9 & 12)
   // =========================================================================
-  const targetTechnologies = [
-    "React",
-    "Next.js",
-    "Angular",
-    "TypeScript",
-    "Contentful",
-    "Headless CMS",
-    "Commerce",
-    "Digital Experience",
-    "Frontend Architecture",
-    "Node.js",
-    "GraphQL",
-    "Design Systems",
-    "REST APIs",
-  ];
+  const weightedTechResult = matchWeightedTechnologies(fullText, job.skills || []);
+  const primaryMatched = weightedTechResult.primaryMatched;
+  const secondaryMatched = weightedTechResult.secondaryMatched;
+  const primaryTechNames = primaryMatched.map((m) => m.technology);
+  const secondaryTechNames = secondaryMatched.map((m) => m.technology);
 
-  const techMatchResult = matchTargetTechnologies(
-    targetTechnologies,
-    fullText,
-    job.skills || []
-  );
-
-  const matchedTechs = techMatchResult.matched;
-  const matchedTechNames = matchedTechs.map((m) => m.technology);
-
-  const hasCoreTech = matchedTechNames.some((t) =>
-    ["React", "Next.js", "Angular", "Contentful", "Commerce", "Headless CMS"].includes(t)
+  const hasCoreTech = primaryTechNames.some((t) =>
+    ["React", "Next.js", "Angular", "Contentful", "Commerce", "Shopify", "Headless CMS"].includes(t)
   );
 
   let techFitStrength: FitStrength = "NONE";
-  if (matchedTechs.length >= 3 || (hasCoreTech && matchedTechs.length >= 2)) {
+  if (primaryMatched.length >= 2 || (hasCoreTech && primaryMatched.length >= 1)) {
     techFitStrength = "STRONG";
-  } else if (matchedTechs.length >= 1) {
+  } else if (primaryMatched.length >= 1) {
     techFitStrength = "MODERATE";
+  } else if (secondaryMatched.length >= 1) {
+    techFitStrength = "WEAK";
   }
 
   const technologyFit: DimensionFit = {
-    matched: matchedTechs.length > 0,
+    matched: primaryMatched.length > 0,
     strength: techFitStrength,
-    evidence: matchedTechs.map((m) => `${m.technology}: "${m.evidence}"`),
+    evidence: primaryMatched.map((m) => `${m.technology}: "${m.evidence}"`),
     reason:
-      matchedTechs.length > 0
-        ? `Found ${matchedTechs.length} verified target technologies: ${matchedTechNames.join(", ")}`
+      primaryMatched.length > 0
+        ? `Found ${primaryMatched.length} primary target technologies: ${primaryTechNames.join(", ")}`
+        : secondaryMatched.length > 0
+        ? `Secondary infrastructure technologies only (${secondaryTechNames.join(", ")})`
         : "Target technologies (React, Next.js, Angular, Contentful, Commerce) not found in posting",
   };
 
   // =========================================================================
-  // 3. Role Family & Role Fit (Broader than just "Architect" title)
+  // 3. Role Family & Role Tier Fit (Requirement 10)
   // =========================================================================
   const roleClassification = job.roleFamily
     ? { primary: job.roleFamily, secondary: [], evidence: [`Title: "${job.title}"`] }
     : classifyRoleFamily(job.title, job.description);
 
-  const targetFamilies: RoleFamily[] = [
-    "FRONTEND_ARCHITECT",
-    "TECHNICAL_ARCHITECT",
-    "SOLUTIONS_ARCHITECT",
-    "TECHNICAL_LEAD",
-    "SENIOR_FRONTEND_ENGINEER",
-    "SOLUTIONS_ENGINEER",
-    "TECHNICAL_CONSULTANT",
-    "IMPLEMENTATION_CONSULTANT",
-    "PROFESSIONAL_SERVICES",
-    "CMS_DIGITAL_EXPERIENCE",
-    "COMMERCE",
-    "ENTERPRISE_INTEGRATION",
-  ];
-
-  const isTargetFamily = targetFamilies.includes(roleClassification.primary);
-  const isArchitectureOrLeadRole = [
-    "FRONTEND_ARCHITECT",
-    "TECHNICAL_ARCHITECT",
-    "SOLUTIONS_ARCHITECT",
-    "TECHNICAL_LEAD",
-    "CMS_DIGITAL_EXPERIENCE",
-    "COMMERCE",
-  ].includes(roleClassification.primary);
-
-  // Broad role fit: A senior title in Commerce/CMS/Frontend also qualifies as strong role fit
-  const isTargetSeniorSpecialist =
-    (matchedDomainKeys.includes("COMMERCE") ||
-      matchedDomainKeys.includes("CMS") ||
-      matchedDomainKeys.includes("FRONTEND")) &&
-    /senior|lead|specialist/i.test(job.title);
+  const roleTierResult = classifyRoleTier(
+    job.title,
+    job.description || "",
+    roleClassification.primary
+  );
+  const roleTier = roleTierResult.tier;
 
   let roleFitStrength: FitStrength = "NONE";
-  if (isArchitectureOrLeadRole || isTargetSeniorSpecialist) {
+  if (roleTier === "TIER_1") {
     roleFitStrength = "STRONG";
-  } else if (isTargetFamily) {
+  } else if (roleTier === "TIER_2") {
     roleFitStrength = "MODERATE";
-  } else if (!isAdjacentDomainOnly && /engineer|developer|architect|lead/i.test(job.title)) {
+  } else if (roleTier === "TIER_3") {
     roleFitStrength = "WEAK";
   }
 
   const roleFit: DimensionFit = {
-    matched: isTargetFamily || isTargetSeniorSpecialist,
+    matched: roleTier === "TIER_1" || roleTier === "TIER_2",
     strength: roleFitStrength,
-    evidence: [`Job title: "${job.title}"`, `Classified role: ${formatRoleFamily(roleClassification.primary)}`],
-    reason:
-      isArchitectureOrLeadRole || isTargetSeniorSpecialist
-        ? `Role (${formatRoleFamily(roleClassification.primary)}) aligns directly with technical leadership / domain direction`
-        : isTargetFamily
-        ? `Role (${formatRoleFamily(roleClassification.primary)}) is within target engineering families`
-        : `Role (${formatRoleFamily(roleClassification.primary)}) is outside core target leadership domains`,
+    evidence: [
+      `Job title: "${job.title}"`,
+      `Classified role: ${formatRoleFamily(roleClassification.primary)} (${formatRoleTier(roleTier)})`,
+    ],
+    reason: roleTierResult.reason,
   };
 
   // =========================================================================
@@ -330,7 +286,12 @@ export function evaluateJobMatch(
   // =========================================================================
   // 6. Travel Fit (Positive Signal, Never a Blocker)
   // =========================================================================
-  const tType = job.travelType || "UNKNOWN";
+  const extractedTravel = (!job.travelType || job.travelType === "UNKNOWN") && job.description
+    ? extractTravelDetails(job.description)
+    : null;
+  const tType = job.travelType || extractedTravel?.type || "UNKNOWN";
+  const tEvidence = job.travelEvidence || extractedTravel?.evidence;
+  const tPercentage = job.travelPercentage ?? extractedTravel?.percentage;
   const isIntlTravel = tType === "INTERNATIONAL_TRAVEL" || tType === "CLIENT_SITE_TRAVEL";
 
   let travelStrength: FitStrength = "NONE";
@@ -347,10 +308,10 @@ export function evaluateJobMatch(
   const travelFit: DimensionFit = {
     matched: isIntlTravel || travelStrength === "MODERATE",
     strength: travelStrength,
-    evidence: job.travelEvidence ? [job.travelEvidence] : [tType],
+    evidence: tEvidence ? [tEvidence] : [tType],
     reason:
       tType === "INTERNATIONAL_TRAVEL"
-        ? `Explicit international travel requirement (${job.travelPercentage ? `${job.travelPercentage}%` : "customer site"}) (Positive Signal)`
+        ? `Explicit international travel requirement (${tPercentage ? `${tPercentage}%` : "customer site"}) (Positive Signal)`
         : tType === "CLIENT_SITE_TRAVEL"
         ? "Client-site travel opportunities (Positive Signal)"
         : tType === "INTERNATIONAL_TEAM_ONLY"
@@ -364,11 +325,10 @@ export function evaluateJobMatch(
   // 7. Client-Facing / Consulting Fit
   // =========================================================================
   const clientFacingKeywords =
-    /\b(?:client|customer|stakeholder|consulting|professional services|solutions|presales|vendor|partner|advisory)\b/i;
+    /\b(?:client|customer|stakeholder|consulting|professional\s+services|presales|vendor|partner|advisory)\b/i;
   const isClientFacing =
     clientFacingKeywords.test(fullTextLower) ||
     [
-      "SOLUTIONS_ARCHITECT",
       "TECHNICAL_CONSULTANT",
       "IMPLEMENTATION_CONSULTANT",
       "PROFESSIONAL_SERVICES",
@@ -416,80 +376,89 @@ export function evaluateJobMatch(
   };
 
   // =========================================================================
-  // 9. Career Fit Classification (HIGH_RELEVANCE, RELEVANT, POSSIBLE, LOW_RELEVANCE)
+  // 9. Career Fit Classification (Strict Phase 7.1 Rules)
   // =========================================================================
   const isIndiaFriendly = locationFit.strength === "STRONG" || locationFit.strength === "MODERATE";
   const hasSeniority = seniorityFit.strength === "STRONG" || seniorityFit.strength === "MODERATE";
-  const hasTargetTech = technologyFit.strength === "STRONG" || technologyFit.strength === "MODERATE";
-  const hasStrongTech = technologyFit.strength === "STRONG";
-  const hasPrimaryDomain = domainFit.strength === "STRONG" || domainFit.strength === "MODERATE";
+  const hasPrimaryTech = primaryMatched.length > 0;
+  const hasStrongTech = techFitStrength === "STRONG";
   const hasStrongPrimaryDomain = domainFit.strength === "STRONG";
-  const isTargetRole = roleFit.strength === "STRONG";
 
-  // Low Priority / Excluded roles check (Section 10 & 11)
+  // Low Priority / Excluded roles check
   const isLowPriorityOrExcluded =
-    /\b(qa\b|quality\s+assurance|tester|testing|sdet|test\s+automation|data\s+scientist|data\s+analyst|machine\s+learning|ai\s+researcher|hr\b|human\s+resources|recruiter|recruitment|talent\s+acquisition|product\s+manager|project\s+manager|scrum\s+master|sales\s+only|account\s+executive|business\s+development|administrative|office\s+assistant|admin\s+assistant|customer\s+support|helpdesk|intern\b|graduate\b|trainee\b|apprentice\b|junior\b|entry\s+level)\b/i.test(
+    /\b(qa\b|quality\s+assurance|tester|testing|sdet|test\s+automation|hr\b|human\s+resources|recruiter|recruitment|talent\s+acquisition|product\s+manager|project\s+manager|scrum\s+master|sales\s+only|account\s+executive|business\s+development|administrative|office\s+assistant|admin\s+assistant|customer\s+support|helpdesk|intern\b|graduate\b|trainee\b|apprentice\b|junior\b|entry\s+level)\b/i.test(
       job.title
     );
 
-  // Section 14: Solutions Architect requires verified technical / architectural dimensions
-  const hasSolutionsArchitectEvidence =
-    matchedPrimaryDomains.some((d) =>
-      [
-        "FRONTEND",
-        "DIGITAL_EXPERIENCE",
-        "CMS",
-        "COMMERCE",
-        "ENTERPRISE_INTEGRATION",
-        "TECHNICAL_ARCHITECTURE",
-        "CLIENT_CONSULTING",
-        "PROFESSIONAL_SERVICES",
-      ].includes(d)
-    ) ||
-    hasTargetTech ||
-    /\b(frontend|digital\s+experience|cms|commerce|integration|apis?|rest\s+apis|customer\s+architecture|cloud|consulting|implementation|microservices)\b/i.test(
-      job.description || ""
-    );
-
-  // Section 14: Senior Software Engineer requires frontend evidence
-  const hasFrontendEvidence =
+  // Section 6: Real Frontend Evidence
+  const hasRealFrontendEvidence =
     matchedDomainKeys.includes("FRONTEND") ||
-    matchedTechNames.some((t) =>
+    primaryTechNames.some((t) =>
       ["React", "Next.js", "Angular", "TypeScript", "JavaScript", "Design Systems"].includes(t)
     ) ||
-    /\b(react|angular|next\.?js|frontend|front[- ]end|ui\b|web\s+application|design\s+systems?|typescript|javascript)\b/i.test(
+    /\b(react|angular|next\.?js|frontend|front[- ]end|ui\s+(?:architect|engineer|developer|lead)|web\s+application|design\s+systems?)\b/i.test(
       `${job.title} ${job.description || ""}`
     );
 
-  const isGenericSoftwareEngineer =
-    /\b(software\s+engineer|software\s+developer|full[- ]?stack)\b/i.test(job.title) &&
-    !/\b(frontend|front[- ]end|ui)\b/i.test(job.title);
+  // Section 7: Real Architecture Evidence
+  const hasRealArchitectureEvidence =
+    /\b(architecture\s+ownership|solution\s+design|technical\s+architecture|system\s+design|enterprise\s+architecture|integration\s+architecture|technical\s+strategy|customer\s+architecture|architecture\s+decisions|technical\s+discovery|implementation\s+architecture|architectural\s+governance|architectural\s+decisions|system\s+architecture|lead\s+architect)\b/i.test(
+      `${job.title} ${job.description || ""}`
+    ) ||
+    matchedPrimaryDomains.some((d) =>
+      ["TECHNICAL_ARCHITECTURE", "SOLUTIONS_ARCHITECTURE", "ENTERPRISE_INTEGRATION"].includes(d)
+    );
+
+  // Client-Facing Architecture / Consulting Evidence (Section 4 & 5)
+  // Must require explicit customer/client engagement, not just the word "Solutions" in title
+  const hasClientConsultingEvidence =
+    /\b(?:client[- ]facing|customer[- ]facing|client\s+consulting|customer\s+architecture|technical\s+consulting|professional\s+services|solution\s+consulting|external\s+stakeholder|presales\s+architecture)\b/i.test(
+      `${job.title} ${job.description || ""}`
+    ) ||
+    (clientFacingFit.strength === "STRONG" &&
+      /\b(?:client|customer|consulting|advisory)\b/i.test(`${job.title} ${job.description || ""}`) &&
+      (roleClassification.primary === "SOLUTIONS_ARCHITECT" ||
+        roleClassification.primary === "TECHNICAL_CONSULTANT" ||
+        roleClassification.primary === "PROFESSIONAL_SERVICES" ||
+        roleClassification.primary === "SOLUTIONS_ENGINEER" ||
+        matchedPrimaryDomains.includes("CLIENT_CONSULTING") ||
+        matchedPrimaryDomains.includes("PROFESSIONAL_SERVICES")));
 
   let relevanceBucket: RelevanceBucket;
 
-  if (isLowPriorityOrExcluded) {
+  if (roleTier === "TIER_5" || isLowPriorityOrExcluded) {
+    relevanceBucket = "LOW_RELEVANCE";
+  } else if (
+    // Section 11: Data/AI roles (Data Scientist, ML, AI Engineer) are LOW_RELEVANCE unless Tier 1 architect
+    (roleClassification.primary === "DATA_AI" ||
+      /\b(data\s+scientist|machine\s+learning|ai\s+engineer|nlp)\b/i.test(job.title)) &&
+    roleTier !== "TIER_1"
+  ) {
     relevanceBucket = "LOW_RELEVANCE";
   } else if (
     isIndiaFriendly &&
     hasSeniority &&
     seniorityResult.level !== "ENTRY" &&
-    !isAdjacentDomainOnly &&
+    seniorityResult.level !== "MID" &&
+    roleTier === "TIER_1" &&
     (
-      // Case A: Technical / Frontend / CMS Architect with verified target tech in India
-      (isArchitectureOrLeadRole &&
-        hasTargetTech &&
-        (roleClassification.primary !== "SOLUTIONS_ARCHITECT" || hasSolutionsArchitectEvidence)) ||
-      // Case B: Deep domain specialist (e.g. Senior Shopify Developer with Next.js, Contentful, Commerce)
-      (hasStrongPrimaryDomain && hasStrongTech) ||
-      // Case C: Solutions Architect with verified evidence + tech + client-facing in India
+      // A. Real Frontend Architect or Senior Frontend Engineer with real frontend evidence & primary tech
+      ((roleClassification.primary === "FRONTEND_ARCHITECT" || roleClassification.primary === "SENIOR_FRONTEND_ENGINEER") &&
+        hasRealFrontendEvidence &&
+        hasPrimaryTech) ||
+      // B. Solutions Architect with customer consulting evidence + architecture or primary tech
       (roleClassification.primary === "SOLUTIONS_ARCHITECT" &&
-        hasSolutionsArchitectEvidence &&
-        clientFacingFit.strength === "STRONG" &&
-        hasTargetTech) ||
-      // Case D: Senior Frontend Engineer with verified frontend evidence & target tech
-      (roleClassification.primary === "SENIOR_FRONTEND_ENGINEER" &&
-        hasFrontendEvidence &&
-        hasTargetTech)
+        hasClientConsultingEvidence &&
+        (hasRealArchitectureEvidence || hasPrimaryTech)) ||
+      // C. Commerce or CMS Architect with primary tech or strong primary domain
+      ((roleClassification.primary === "COMMERCE" || roleClassification.primary === "CMS_DIGITAL_EXPERIENCE") &&
+        (hasPrimaryTech || hasStrongPrimaryDomain)) ||
+      // D. Technical Architect with architecture evidence and target tech or integration
+      (roleClassification.primary === "TECHNICAL_ARCHITECT" &&
+        hasRealArchitectureEvidence &&
+        (hasPrimaryTech || matchedPrimaryDomains.length >= 1)) ||
+      // E. Deep primary domain specialist with strong primary tech (e.g. Next.js + Contentful + Commerce)
+      (hasStrongPrimaryDomain && hasStrongTech && hasRealFrontendEvidence)
     )
   ) {
     relevanceBucket = "HIGH_RELEVANCE";
@@ -497,19 +466,39 @@ export function evaluateJobMatch(
     isIndiaFriendly &&
     hasSeniority &&
     seniorityResult.level !== "ENTRY" &&
+    seniorityResult.level !== "MID" &&
+    // Role alignment check:
     (
-      (isTargetRole && (!isGenericSoftwareEngineer || hasFrontendEvidence)) ||
-      hasPrimaryDomain ||
-      clientFacingFit.strength === "STRONG" ||
-      hasTargetTech
+      // Tier 1 roles that didn't qualify for HIGH
+      roleTier === "TIER_1" ||
+      // Tier 2 roles with primary tech, domain match, or client consulting
+      (roleTier === "TIER_2" && (hasPrimaryTech || matchedPrimaryDomains.length >= 1 || hasClientConsultingEvidence)) ||
+      // Tier 3 roles ONLY if they have real frontend evidence or real architecture evidence
+      (roleTier === "TIER_3" && (hasRealFrontendEvidence || hasRealArchitectureEvidence)) ||
+      // Tier 4 roles ONLY if strong architecture + frontend evidence exists (otherwise Tier 4 is POSSIBLE/LOW)
+      (roleTier === "TIER_4" && hasRealFrontendEvidence && hasRealArchitectureEvidence)
     )
   ) {
     relevanceBucket = "RELEVANT";
   } else if (
-    hasTargetTech ||
-    hasPrimaryDomain ||
+    roleTier === "TIER_4"
+  ) {
+    // Section 11: Tier 4 roles (DevOps, SRE, Cloud Ops, Rust, Backend)
+    // Only POSSIBLE if architecture or client consulting overlap exists; otherwise LOW_RELEVANCE
+    if (
+      hasRealArchitectureEvidence ||
+      hasClientConsultingEvidence ||
+      (hasPrimaryTech && hasRealFrontendEvidence)
+    ) {
+      relevanceBucket = "POSSIBLE";
+    } else {
+      relevanceBucket = "LOW_RELEVANCE";
+    }
+  } else if (
+    hasPrimaryTech ||
+    matchedPrimaryDomains.length >= 1 ||
     (hasSeniority && isIndiaFriendly && seniorityResult.level !== "ENTRY") ||
-    isTargetRole
+    matchedDomainKeys.length >= 1
   ) {
     relevanceBucket = "POSSIBLE";
   } else {
@@ -517,95 +506,152 @@ export function evaluateJobMatch(
   }
 
   // =========================================================================
-  // 10. Transparent, Documented Sorting Score (Never opaque AI probability)
+  // 10. Transparent, Deterministic Priority Scoring (Section 16)
+  // Deterministic Ranking Order:
+  // 1. Career Fit
+  // 2. Target Role Tier
+  // 3. Seniority
+  // 4. Primary Technology Match
+  // 5. Primary Domain Match
+  // 6. Client Facing
+  // 7. India Eligibility
+  // 8. International Customer Exposure
+  // 9. International Travel
+  // 10. Freshness
   // =========================================================================
-  // Base tier points:
   let score = 20;
   if (relevanceBucket === "HIGH_RELEVANCE") score = 85;
   else if (relevanceBucket === "RELEVANT") score = 65;
-  else if (relevanceBucket === "POSSIBLE") score = 45;
-  else score = 20;
+  else if (relevanceBucket === "POSSIBLE") score = 42;
+  else score = 15;
 
-  // Documented Component Modifiers:
-  // Location: Hyderabad (+6 pts), Remote India / Confirmed Worldwide (+5 pts), Target Metros (+4 pts)
-  if (normLoc === "HYDERABAD") score += 6;
-  else if (normLoc === "REMOTE_INDIA" || (normLoc === "REMOTE_GLOBAL" && indiaCheck.isIndiaEligible)) score += 5;
-  else if (["BANGALORE", "PUNE", "CHENNAI", "MUMBAI", "DELHI_NCR"].includes(normLoc)) score += 4;
-  else if (!indiaCheck.isIndiaEligible) score -= 10;
+  // 2. Role Tier Modifier:
+  if (roleTier === "TIER_1") score += 8;
+  else if (roleTier === "TIER_2") score += 4;
+  else if (roleTier === "TIER_3") score += 1;
+  else if (roleTier === "TIER_4") score -= 5;
+  else if (roleTier === "TIER_5") score -= 15;
 
-  // Technology Strength Modifier:
-  if (technologyFit.strength === "STRONG") score += 5;
-  else if (technologyFit.strength === "MODERATE") score += 3;
+  // 3. Seniority Modifier:
+  if (seniorityResult.level === "ARCHITECT" || seniorityResult.level === "PRINCIPAL") score += 3;
+  else if (seniorityResult.level === "STAFF" || seniorityResult.level === "LEAD") score += 2;
+  else if (seniorityResult.level === "SENIOR") score += 1;
 
-  // Domain Strength Modifier:
-  if (domainFit.strength === "STRONG") score += 5;
-  else if (domainFit.strength === "MODERATE") score += 3;
+  // 4. Primary Technology Match Modifier:
+  if (primaryMatched.length >= 3) score += 5;
+  else if (primaryMatched.length >= 1) score += 3;
 
-  // Positive Travel Signal:
-  if (travelFit.strength === "STRONG") score += 4;
+  // Secondary Tech Modifier: capped at +1 (must NOT dominate ranking!)
+  if (secondaryMatched.length >= 1 && primaryMatched.length > 0) score += 1;
 
-  // Client-Facing Signal:
-  if (clientFacingFit.strength === "STRONG") score += 3;
+  // 5. Primary Domain Modifier:
+  if (matchedPrimaryDomains.length >= 2) score += 4;
+  else if (matchedPrimaryDomains.length >= 1) score += 2;
 
-  // Freshness Ordering Boost (separate from relevance bucket):
+  // 6. Client-Facing Modifier:
+  if (clientFacingFit.strength === "STRONG") score += 2;
+
+  // 7. Location & India Eligibility:
+  if (normLoc === "HYDERABAD") score += 4;
+  else if (normLoc === "REMOTE_INDIA" || (normLoc === "REMOTE_GLOBAL" && indiaCheck.isIndiaEligible)) score += 3;
+  else if (["BANGALORE", "PUNE", "CHENNAI", "MUMBAI", "DELHI_NCR"].includes(normLoc)) score += 2;
+  else if (!indiaCheck.isIndiaEligible) score -= 8;
+
+  // 8. International / Travel (Bonus, never beats career fit):
+  if (travelFit.strength === "STRONG") score += 2;
+
+  // 9. Freshness:
   if (freshnessStatus === "FRESH") score += 2;
   else if (freshnessStatus === "RECENT") score += 1;
 
   score = Math.min(100, Math.max(10, score));
 
   // =========================================================================
-  // 11. Concrete "WHY THIS FITS" & "POTENTIAL GAPS"
+  // 11. Concrete "WHY THIS FITS" & "POTENTIAL GAPS" (Section 13 & 14)
   // =========================================================================
   const whyThisFits: string[] = [];
-  if (roleFit.strength === "STRONG") {
-    whyThisFits.push(`✓ Role: ${formatRoleFamily(roleClassification.primary)} (Evidence: "${job.title}")`);
+
+  // Role alignment
+  if (roleTier === "TIER_1") {
+    whyThisFits.push(`✓ ${formatRoleFamily(roleClassification.primary)} role (Core Target Architecture)`);
+  } else if (roleTier === "TIER_2") {
+    whyThisFits.push(`✓ ${formatRoleFamily(roleClassification.primary)} role (Consulting / Solutions Engineering)`);
+  } else if (roleFit.strength === "STRONG") {
+    whyThisFits.push(`✓ Technical Leadership role: "${job.title}"`);
   }
+
+  // Client-facing architecture
+  if (hasClientConsultingEvidence && hasRealArchitectureEvidence) {
+    whyThisFits.push(`✓ Customer-facing architecture & technical consulting`);
+  } else if (clientFacingFit.strength === "STRONG") {
+    whyThisFits.push(`✓ Client-facing stakeholder engagement`);
+  }
+
+  // Primary technologies matched
+  if (primaryMatched.length > 0) {
+    const techNames = primaryMatched.slice(0, 3).map((m) => m.technology).join(" + ");
+    whyThisFits.push(`✓ Target technology: ${techNames}`);
+  }
+
+  // Primary domains
   if (matchedPrimaryDomains.length > 0) {
-    whyThisFits.push(`✓ Domain: ${matchedPrimaryDomains.slice(0, 3).map(formatDomainName).join(", ")}`);
+    whyThisFits.push(`✓ Domain: ${matchedPrimaryDomains.slice(0, 2).map(formatDomainName).join(", ")}`);
   }
-  if (matchedTechs.length > 0) {
-    matchedTechs.slice(0, 3).forEach((m) => {
-      whyThisFits.push(`✓ ${m.technology} (Evidence: "${m.evidence}")`);
-    });
+
+  // Seniority
+  if (seniorityStrength === "STRONG" && (roleTier === "TIER_1" || roleTier === "TIER_2")) {
+    whyThisFits.push(`✓ 12+ years senior architect/lead depth (${seniorityResult.level})`);
   }
-  if (seniorityStrength === "STRONG" && seniorityResult.level !== "UNKNOWN") {
-    whyThisFits.push(`✓ ${seniorityResult.level} seniority (Evidence: ${seniorityResult.evidence})`);
-  }
-  if (locationFit.strength === "STRONG") {
-    whyThisFits.push(`✓ ${locationReason}`);
+
+  // Location (supporting dimension)
+  if (normLoc === "HYDERABAD") {
+    whyThisFits.push(`✓ India based (Hyderabad Hub)`);
+  } else if (normLoc === "REMOTE_INDIA") {
+    whyThisFits.push(`✓ India based (Remote India)`);
   } else if (indiaCheck.isIndiaEligible) {
-    whyThisFits.push(`✓ India eligible (${job.location})`);
+    whyThisFits.push(`✓ India based (${job.location})`);
   }
+
+  // Travel
   if (travelFit.strength === "STRONG" && job.travelEvidence) {
     whyThisFits.push(`✓ Travel: ${job.travelEvidence}`);
   } else if (travelFit.strength === "STRONG") {
-    whyThisFits.push(`✓ Travel: International / client-site travel${job.travelPercentage ? ` up to ${job.travelPercentage}%` : ""}`);
-  }
-  if (clientFacingFit.strength === "STRONG") {
-    whyThisFits.push(`✓ Client-facing / stakeholder consulting exposure`);
+    whyThisFits.push(`✓ Travel: International / client-site travel`);
   }
 
+  // Meaningful Gaps (Section 14)
   const potentialGaps: string[] = [];
-  if (!indiaCheck.isIndiaEligible) {
-    potentialGaps.push(`! Location (${job.location}) does not confirm India hiring eligibility`);
-  }
-  if (tType === "RELOCATION") {
-    potentialGaps.push(`! Requires relocation: ${job.travelEvidence || "International relocation"}`);
-  }
-  if (seniorityResult.experienceMin && seniorityResult.experienceMin > 15) {
-    potentialGaps.push(`! Requires ${seniorityResult.experienceMin}+ years experience`);
-  }
-  if (seniorityResult.level === "ENTRY" || seniorityResult.level === "MID") {
-    potentialGaps.push(`! Listed as ${seniorityResult.level}-level opportunity`);
-  }
-  if (matchedTechs.length === 0) {
-    potentialGaps.push("! Target technologies (React, Next.js, Angular, Contentful, Commerce) not found in posting");
-  }
-  if (isAdjacentDomainOnly) {
+
+  if (/\b(devops|sre|infrastructure)\b/i.test(job.title)) {
+    potentialGaps.push("! Primary focus is DevOps rather than frontend architecture");
+  } else if (/\b(cloud\s+operations|cloud\s+ops)\b/i.test(job.title)) {
+    potentialGaps.push("! Primary focus is Cloud Operations rather than architecture");
+  } else if (/\b(data\s+scientist|data\s+engineer|machine\s+learning|ai\s+engineer)\b/i.test(job.title) || roleClassification.primary === "DATA_AI") {
+    potentialGaps.push("! Role is primarily Data/AI rather than frontend or technical architecture");
+  } else if (/\b(rust|c\+\+|golang|backend\s+engineer|java\s+engineer)\b/i.test(job.title) && !hasRealFrontendEvidence) {
+    potentialGaps.push("! Role is primarily backend systems engineering rather than frontend/digital experience");
+  } else if (roleTier === "TIER_4") {
     potentialGaps.push(`! Primary focus on adjacent domain (${matchedDomainKeys.map(formatDomainName).join(", ")}) rather than frontend/CMS`);
   }
-  if (roleFit.strength === "NONE" || roleFit.strength === "WEAK") {
-    potentialGaps.push(`! Role title does not explicitly state architecture or technical lead responsibilities`);
+
+  if (primaryMatched.length === 0) {
+    potentialGaps.push("! Target technologies (React, Next.js, Angular, Contentful, Commerce) not found in posting");
+  }
+
+  if (!indiaCheck.isIndiaEligible) {
+    potentialGaps.push(`! Location does not confirm India eligibility (${job.location})`);
+  }
+
+  if (tType === "RELOCATION") {
+    potentialGaps.push(`! Requires physical relocation: ${job.travelEvidence || "International relocation"}`);
+  }
+
+  if (seniorityResult.level === "ENTRY" || seniorityResult.level === "MID") {
+    potentialGaps.push(`! Listed as ${seniorityResult.level}-level opportunity (below 12+ years target)`);
+  }
+
+  if (roleTier === "TIER_3" && !hasRealFrontendEvidence && !hasRealArchitectureEvidence) {
+    potentialGaps.push("! General software engineering role without explicit frontend or architecture leadership scope");
   }
 
   // =========================================================================
@@ -623,6 +669,23 @@ export function evaluateJobMatch(
     freshnessFit,
   };
 
+  // Build full technology details array covering all profile technologies for backward compatibility
+  const techSourceList: string[] =
+    (profile as { technologies?: string[] })?.technologies ||
+    profile?.targetSkills ||
+    PRIMARY_TARGET_TECHNOLOGIES;
+  const allProfileTechDetails: TechnologyMatchDetail[] = techSourceList.map((t: string) => {
+    const p = primaryMatched.find((m) => m.technology.toLowerCase() === t.toLowerCase());
+    if (p) return p;
+    const s = secondaryMatched.find((m) => m.technology.toLowerCase() === t.toLowerCase());
+    if (s) return s;
+    return {
+      technology: t,
+      matched: false,
+      evidence: null,
+    };
+  });
+
   // Backwards compatibility for legacy breakdown
   const legacyRoleMatch: MatchCriterion = {
     matched: roleFit.matched,
@@ -633,7 +696,7 @@ export function evaluateJobMatch(
     matched: technologyFit.matched,
     evidence: technologyFit.evidence,
     reason: technologyFit.reason,
-    details: [...techMatchResult.matched, ...techMatchResult.unmatched],
+    details: allProfileTechDetails,
   };
   const legacyExpMatch: MatchCriterion = {
     matched: expMatchesYears,
@@ -679,6 +742,9 @@ export function evaluateJobMatch(
     whyThisFits: whyThisFits.slice(0, 7),
     cautions: potentialGaps.slice(0, 4),
     potentialGaps: potentialGaps.slice(0, 4),
+    roleTier,
+    primaryTechnologiesMatched: primaryTechNames,
+    secondaryTechnologiesMatched: secondaryTechNames,
     domainMatches,
     secondaryEvidenceDomains,
     dimensions,

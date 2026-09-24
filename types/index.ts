@@ -22,8 +22,10 @@ export type MarketRegion =
   | "INDIA"
   | "EMEA"
   | "NORTH_AMERICA"
+  | "LATAM"
   | "APAC"
   | "GLOBAL_REMOTE"
+  | "MULTI_REGION_REMOTE"
   | "UNKNOWN";
 
 export type EmeaCountry =
@@ -50,10 +52,13 @@ export type OpportunityType =
   | "INDIA_REMOTE"
   | "INDIA_INTERNATIONAL"
   | "INDIA_CLIENT_FACING"
+  | "INDIA_INTERNATIONAL_CUSTOMERS"
   | "INDIA_INTERNATIONAL_TRAVEL"
+  | "INDIA_CLIENT_SITE_TRAVEL"
   | "EMEA_LOCAL"
   | "EMEA_REMOTE"
   | "GLOBAL_REMOTE"
+  | "MULTI_REGION_REMOTE"
   | "RELOCATION"
   | "UNKNOWN";
 
@@ -138,11 +143,13 @@ export type NormalizedLocation =
   | "INDIA_OTHER"
   | "REMOTE_INDIA"
   | "REMOTE_GLOBAL"
+  | "MULTI_REGION"
   | "USA"
   | "EUROPE"
   | "MIDDLE_EAST"
   | "SINGAPORE"
-  | "OTHER";
+  | "OTHER"
+  | "UNKNOWN";
 
 export type TravelPercentageRange =
   | "10-20%"
@@ -196,6 +203,13 @@ export type SeniorityLevel =
   | "ARCHITECT"
   | "DIRECTOR"
   | "UNKNOWN";
+
+export type RoleTier =
+  | "TIER_1"
+  | "TIER_2"
+  | "TIER_3"
+  | "TIER_4"
+  | "TIER_5";
 
 export type RelevanceBucket =
   | "HIGH_RELEVANCE"
@@ -289,6 +303,9 @@ export interface JobMatchDetails {
   whyThisFits: string[]; // "WHY THIS FITS"
   cautions: string[]; // Reasons why it may not match ("! ...")
   potentialGaps: string[]; // "POTENTIAL GAPS"
+  roleTier?: RoleTier;
+  primaryTechnologiesMatched?: string[];
+  secondaryTechnologiesMatched?: string[];
   domainMatches: DomainMatchDetail[];
   secondaryEvidenceDomains?: CareerDomain[];
   dimensions: CareerFitDimensions;
@@ -347,8 +364,11 @@ export interface Job {
   actualJobTechnologies: string[];
   matchedTargetTechnologies: string[];
   technologyMatchDetails: TechnologyMatchDetail[];
+  primaryTechnologiesMatched?: string[];
+  secondaryTechnologiesMatched?: string[];
   roleFamily: RoleFamily;
   secondaryRoleFamilies?: RoleFamily[];
+  roleTier?: RoleTier;
   domains: CareerDomain[];
   secondaryEvidenceDomains?: CareerDomain[];
   domainMatches: DomainMatchDetail[];
@@ -385,6 +405,7 @@ export interface Job {
 
   // Phase 7: Global / EMEA Market & Opportunity classification
   market?: MarketRegion;
+  regions?: string[];
   emeaCountry?: EmeaCountry;
   opportunityType?: OpportunityType;
   opportunityTypes?: OpportunityType[];

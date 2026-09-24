@@ -79,9 +79,15 @@ export function classifyOpportunityTypes(params: {
   }
 
   // 1. INDIA OPPORTUNITIES
-  if (market === "INDIA" || (isIndiaEligible && market !== "GLOBAL_REMOTE" && market !== "EMEA")) {
+  if (market === "INDIA" || (isIndiaEligible && market !== "GLOBAL_REMOTE" && market !== "MULTI_REGION_REMOTE" && market !== "EMEA")) {
+    if (travel?.type === "CLIENT_SITE_TRAVEL" || exposureVal === "CLIENT_SITE_TRAVEL") {
+      types.push("INDIA_CLIENT_SITE_TRAVEL");
+    }
     if (hasIntlTravel) {
       types.push("INDIA_INTERNATIONAL_TRAVEL");
+    }
+    if (exposureVal === "INTERNATIONAL_CUSTOMERS" || hasIntlExposure) {
+      types.push("INDIA_INTERNATIONAL_CUSTOMERS");
     }
     if (isClientFacing) {
       types.push("INDIA_CLIENT_FACING");
@@ -105,7 +111,11 @@ export function classifyOpportunityTypes(params: {
     }
   }
 
-  // 3. GLOBAL REMOTE OPPORTUNITIES
+  // 3. MULTI-REGION & GLOBAL REMOTE OPPORTUNITIES
+  if (market === "MULTI_REGION_REMOTE") {
+    types.push("MULTI_REGION_REMOTE");
+  }
+
   if (market === "GLOBAL_REMOTE" || travel?.type === "REMOTE_GLOBAL") {
     types.push("GLOBAL_REMOTE");
   }
@@ -120,9 +130,17 @@ export function classifyOpportunityTypes(params: {
   let primary: OpportunityType = types[0];
   if (market === "GLOBAL_REMOTE" && types.includes("GLOBAL_REMOTE")) {
     primary = "GLOBAL_REMOTE";
+  } else if (market === "MULTI_REGION_REMOTE" && types.includes("MULTI_REGION_REMOTE")) {
+    primary = "MULTI_REGION_REMOTE";
   } else if (types.includes("INDIA_INTERNATIONAL_TRAVEL")) {
     primary = "INDIA_INTERNATIONAL_TRAVEL";
-  } else if (types.includes("INDIA_CLIENT_FACING") && types.includes("INDIA_INTERNATIONAL")) {
+  } else if (types.includes("INDIA_CLIENT_SITE_TRAVEL")) {
+    primary = "INDIA_CLIENT_SITE_TRAVEL";
+  } else if (types.includes("INDIA_CLIENT_FACING") && types.includes("INDIA_INTERNATIONAL_CUSTOMERS")) {
+    primary = "INDIA_CLIENT_FACING";
+  } else if (types.includes("INDIA_INTERNATIONAL_CUSTOMERS")) {
+    primary = "INDIA_INTERNATIONAL_CUSTOMERS";
+  } else if (types.includes("INDIA_CLIENT_FACING")) {
     primary = "INDIA_CLIENT_FACING";
   } else if (types.includes("INDIA_INTERNATIONAL")) {
     primary = "INDIA_INTERNATIONAL";
@@ -157,6 +175,9 @@ export function classifyOpportunityTypes(params: {
     if (!types.includes("INDIA_INTERNATIONAL")) {
       types.push("INDIA_INTERNATIONAL");
     }
+    if (!types.includes("INDIA_INTERNATIONAL_CUSTOMERS")) {
+      types.push("INDIA_INTERNATIONAL_CUSTOMERS");
+    }
   }
 
   return {
@@ -177,14 +198,20 @@ export function formatOpportunityType(type: OpportunityType): string {
       return "India International";
     case "INDIA_CLIENT_FACING":
       return "India Client-Facing";
+    case "INDIA_INTERNATIONAL_CUSTOMERS":
+      return "India Intl Customers";
     case "INDIA_INTERNATIONAL_TRAVEL":
       return "India Intl Travel";
+    case "INDIA_CLIENT_SITE_TRAVEL":
+      return "India Client-Site Travel";
     case "EMEA_LOCAL":
       return "EMEA Local";
     case "EMEA_REMOTE":
       return "EMEA Remote";
     case "GLOBAL_REMOTE":
       return "Global Remote";
+    case "MULTI_REGION_REMOTE":
+      return "Multi-Region Remote";
     case "RELOCATION":
       return "Relocation";
     case "UNKNOWN":

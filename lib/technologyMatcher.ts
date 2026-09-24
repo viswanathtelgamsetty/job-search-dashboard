@@ -14,8 +14,12 @@ export const TECH_PATTERNS: Array<{
   { name: "TypeScript", pattern: /\btypescript\b/i, isFrontendTarget: true },
   { name: "JavaScript", pattern: /\b(?:javascript|es6|es20\d\d)\b/i, isFrontendTarget: true },
   { name: "Contentful", pattern: /\bcontentful\b/i, isFrontendTarget: true },
+  { name: "Contentstack", pattern: /\bcontentstack\b/i, isFrontendTarget: true },
   { name: "Headless CMS", pattern: /\b(?:headless\s+cms|strapi|sanity|storyblok)\b/i, isFrontendTarget: true },
-  { name: "Commerce", pattern: /\b(?:shopify(?:\s+plus)?|commercetools|headless\s+commerce|magento)\b/i, isFrontendTarget: true },
+  { name: "Commerce", pattern: /\b(?:shopify(?:\s+plus)?|commercetools|headless\s+commerce|magento|kibo)\b/i, isFrontendTarget: true },
+  { name: "Shopify", pattern: /\bshopify(?:\s+plus)?\b/i, isFrontendTarget: true },
+  { name: "Commercetools", pattern: /\bcommercetools\b/i, isFrontendTarget: true },
+  { name: "Kibo", pattern: /\bkibo(?:\s+commerce)?\b/i, isFrontendTarget: true },
   { name: "Digital Experience", pattern: /\b(?:digital\s+experience|dxp|adobe\s+experience\s+manager|aem)\b/i, isFrontendTarget: true },
   { name: "Frontend Architecture", pattern: /\b(?:frontend\s+architecture|front-end\s+architecture|micro-?frontends?)\b/i, isFrontendTarget: true },
   { name: "Design Systems", pattern: /\bdesign\s+systems?\b/i, isFrontendTarget: true },
@@ -25,9 +29,17 @@ export const TECH_PATTERNS: Array<{
     pattern: /\b(?:node\.?js|nodejs|node(?:\s*,\s*(?:react|python|java|\.net|typescript|go|ruby|express|c#))|node(?:\s+(?:backend|runtime|server|developer|engineer|services?|microservices?)))\b/i,
     isFrontendTarget: true,
   },
-  { name: "REST APIs", pattern: /\b(?:rest(?:ful)?\s+apis?|api\s+design)\b/i, isFrontendTarget: true },
+  { name: "REST APIs", pattern: /\b(?:rest(?:ful)?\s+apis?|api\s+design|rest\s+api)\b/i, isFrontendTarget: true },
 
-  // Other common technologies (so non-target jobs accurately show their real stack!)
+  // Secondary / adjacent infrastructure technologies
+  { name: "AWS", pattern: /\b(?:aws|amazon\s+web\s+services)\b/i },
+  { name: "Azure", pattern: /\bazure\b/i },
+  { name: "GCP", pattern: /\b(?:gcp|google\s+cloud)\b/i },
+  { name: "Kubernetes", pattern: /\b(?:kubernetes|k8s)\b/i },
+  { name: "Docker", pattern: /\bdocker\b/i },
+  { name: "Terraform", pattern: /\bterraform\b/i },
+
+  // Other common technologies
   { name: "Vue.js", pattern: /\b(?:vue(?:\.js|js)?)\b/i },
   { name: "Java", pattern: /\bjava\b/i },
   { name: "Python", pattern: /\bpython\b/i },
@@ -39,18 +51,40 @@ export const TECH_PATTERNS: Array<{
   { name: "Rust", pattern: /\brust\b/i },
   { name: "Swift", pattern: /\bswift\b/i },
   { name: "Kotlin", pattern: /\bkotlin\b/i },
-  { name: "AWS", pattern: /\b(?:aws|amazon\s+web\s+services)\b/i },
-  { name: "Azure", pattern: /\bazure\b/i },
-  { name: "GCP", pattern: /\b(?:gcp|google\s+cloud)\b/i },
-  { name: "Kubernetes", pattern: /\b(?:kubernetes|k8s)\b/i },
-  { name: "Docker", pattern: /\bdocker\b/i },
   { name: "PostgreSQL", pattern: /\b(?:postgresql|postgres)\b/i },
   { name: "MongoDB", pattern: /\bmongodb\b/i },
   { name: "Redis", pattern: /\bredis\b/i },
   { name: "Kafka", pattern: /\bkafka\b/i },
   { name: "Elasticsearch", pattern: /\belasticsearch\b/i },
-  { name: "Terraform", pattern: /\bterraform\b/i },
   { name: "Microservices", pattern: /\bmicroservices\b/i },
+];
+
+export const PRIMARY_TARGET_TECHNOLOGIES = [
+  "React",
+  "Next.js",
+  "Angular",
+  "TypeScript",
+  "JavaScript",
+  "Contentful",
+  "Contentstack",
+  "Commerce",
+  "Shopify",
+  "Commercetools",
+  "Kibo",
+  "Headless CMS",
+  "Node.js",
+  "GraphQL",
+  "REST APIs",
+  "Design Systems",
+];
+
+export const SECONDARY_TECHNOLOGIES = [
+  "AWS",
+  "Azure",
+  "GCP",
+  "Docker",
+  "Kubernetes",
+  "Terraform",
 ];
 
 /**
@@ -184,4 +218,33 @@ export function matchTargetTechnologies(
   }
 
   return { matched, unmatched };
+}
+
+export function matchWeightedTechnologies(
+  jobText: string,
+  actualJobTechs: string[]
+): {
+  primaryMatched: TechnologyMatchDetail[];
+  secondaryMatched: TechnologyMatchDetail[];
+  allMatched: TechnologyMatchDetail[];
+  unmatched: TechnologyMatchDetail[];
+} {
+  const primaryResult = matchTargetTechnologies(
+    PRIMARY_TARGET_TECHNOLOGIES,
+    jobText,
+    actualJobTechs
+  );
+
+  const secondaryResult = matchTargetTechnologies(
+    SECONDARY_TECHNOLOGIES,
+    jobText,
+    actualJobTechs
+  );
+
+  return {
+    primaryMatched: primaryResult.matched,
+    secondaryMatched: secondaryResult.matched,
+    allMatched: [...primaryResult.matched, ...secondaryResult.matched],
+    unmatched: [...primaryResult.unmatched, ...secondaryResult.unmatched],
+  };
 }

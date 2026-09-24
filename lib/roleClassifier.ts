@@ -1,9 +1,93 @@
-import type { RoleFamily } from "@/types";
+import type { RoleFamily, RoleTier } from "@/types";
 
 export interface RoleClassificationResult {
   primary: RoleFamily;
   secondary: RoleFamily[];
   evidence: string[];
+}
+
+export function classifyRoleTier(
+  title: string,
+  description = "",
+  roleFamily: RoleFamily = "OTHER"
+): { tier: RoleTier; reason: string } {
+  const t = (title || "").toLowerCase();
+  const d = (description || "").toLowerCase();
+
+  // TIER 5: Non-technical / unrelated
+  if (
+    /\b(account\s+management|key\s+account|sales|recruiter|recruiting|recruitment|talent\s+acquisition|hr\b|human\s+resources|talent|marketing|(?:business|sales|people|office)\s+operations|operations\s+manager|customer\s+support|finance|office|admin\b|administrative|legal|scrum\s+master|project\s+manager|product\s+manager|qa\s+tester|manual\s+tester)\b/i.test(
+      t
+    )
+  ) {
+    return { tier: "TIER_5", reason: "Non-technical or unrelated domain role" };
+  }
+
+  // TIER 4: Backend / Cloud / DevOps / SRE / Data / AI / Security / Systems
+  const isPureTier4 =
+    /\b(cloud\s+operations|cloud\s+ops|devops|sre\b|site\s+reliability|infrastructure\s+engineer|platform\s+engineer|linux\s+engineer|systems?\s+engineer)\b/i.test(t) ||
+    /\b(data\s+scientist|data\s+engineer|machine\s+learning|ai\s+engineer|ai\s+specialist|ai\s+researcher|deep\s+learning|nlp\s+engineer)\b/i.test(t) ||
+    /\b(security\s+engineer|security\s+architect|infosec|cybersecurity)\b/i.test(t) ||
+    /\b(rust\s+(?:engineering\s+lead|engineer|developer)|java\s+engineer|c\+\+\s+engineer|golang\s+engineer|backend\s+engineer|pure\s+backend)\b/i.test(t) ||
+    roleFamily === "DATA_AI";
+
+  const hasFrontendOrArchOverride =
+    /\b(frontend|front[- ]end|ui\s+architect|solutions?\s+architect|digital\s+experience|cms\s+architect|commerce\s+architect)\b/i.test(t) ||
+    (/\b(solutions?\s+architect|technical\s+architect)\b/i.test(t) && !/\b(security|data|cloud\s+ops)\b/i.test(t)) ||
+    (/\b(frontend\s+architecture|react|next\.?js)\b/i.test(d) && /\b(lead|principal|staff)\b/i.test(t));
+
+  if (isPureTier4 && !hasFrontendOrArchOverride) {
+    return { tier: "TIER_4", reason: "Tier 4: Infrastructure, Cloud Operations, Data/AI, Security, or Systems Backend role" };
+  }
+
+  // TIER 1: Core target architecture & frontend leadership
+  // Frontend Architect, Technical Architect, Solutions Architect, Digital Experience Architect,
+  // CMS Architect, Commerce Architect, Client-facing Technical Architect,
+  // Professional Services Architect, Senior/Staff/Principal Frontend Engineer
+  const isTier1 =
+    roleFamily === "FRONTEND_ARCHITECT" ||
+    roleFamily === "COMMERCE" ||
+    roleFamily === "CMS_DIGITAL_EXPERIENCE" ||
+    roleFamily === "SENIOR_FRONTEND_ENGINEER" ||
+    /\b(frontend\s+architect|front[- ]end\s+architect|ui\s+architect|web\s+architect)\b/i.test(t) ||
+    /\b(technical\s+architect|tech\s+architect|enterprise\s+architect|system\s+architect|solutions?\s+architect|commerce\s+architect|cms\s+architect|dxp\s+architect)\b/i.test(t) ||
+    /\b(professional\s+services\s+architect|consulting\s+architect|client[- ]facing\s+architect)\b/i.test(t) ||
+    (/\b(architect)\b/i.test(t) && !/\b(security|data|hardware|building|landscape|cloud\s+ops)\b/i.test(t)) ||
+    (/\b(senior|staff|principal|lead)\b/i.test(t) && /\b(frontend|front[- ]end|ui\s+engineer|ui\s+developer|react|web\s+application\s+developer)\b/i.test(t));
+
+  if (isTier1) {
+    return { tier: "TIER_1", reason: "Tier 1: Core Target Architecture or Senior Frontend role" };
+  }
+
+  // TIER 2: Technical Consultant, Solutions Consultant, Implementation Consultant, Customer Engineer, Solutions Engineer, Senior Full Stack Engineer (with frontend depth)
+  const isTier2 =
+    roleFamily === "TECHNICAL_CONSULTANT" ||
+    roleFamily === "SOLUTIONS_ENGINEER" ||
+    roleFamily === "IMPLEMENTATION_CONSULTANT" ||
+    roleFamily === "PROFESSIONAL_SERVICES" ||
+    roleFamily === "ENTERPRISE_INTEGRATION" ||
+    /\b(technical\s+consultant|technology\s+consultant|solutions?\s+consultant|implementation\s+consultant|solutions?\s+engineer|customer\s+engineer|presales|pre-sales)\b/i.test(t) ||
+    (/\b(full[- ]?stack)\b/i.test(t) && /\b(senior|staff|lead|principal)\b/i.test(t));
+
+  if (isTier2) {
+    return { tier: "TIER_2", reason: "Tier 2: Solutions Engineering, Technical Consulting, or Full Stack role" };
+  }
+
+  // TIER 3: Senior / Staff / Principal Software Engineer (generalist)
+  const isTier3 =
+    /\b(senior\s+software\s+engineer|sr\.?\s+software\s+engineer|staff\s+software\s+engineer|principal\s+software\s+engineer|lead\s+software\s+engineer|senior\s+developer|staff\s+developer|lead\s+developer)\b/i.test(t) ||
+    roleFamily === "SOFTWARE_ENGINEERING" ||
+    roleFamily === "TECHNICAL_LEAD";
+
+  if (isTier3) {
+    return { tier: "TIER_3", reason: "Tier 3: Senior/Staff/Principal Software Engineer (Generalist)" };
+  }
+
+  if (!/\b(engineer|architect|developer|programmer|lead|consultant|coder|tech|technical|devops|sre|software|cloud|platform|data|systems?)\b/i.test(t)) {
+    return { tier: "TIER_5", reason: "Tier 5: Non-technical or unrelated domain role" };
+  }
+
+  return { tier: "TIER_4", reason: "Tier 4: General or adjacent engineering role" };
 }
 
 export function classifyRoleFamily(
@@ -84,10 +168,13 @@ export function classifyRoleFamily(
 
   // 7. TECHNICAL_LEAD
   const isNonTechnicalLead = /\b(account\s+management|key\s+account|sales|recruiting|hr\b|talent|marketing|operations|customer\s+support|finance|office)\b/i.test(t);
+  const isSystemsOrBackendLead = /\b(rust|c\+\+|embedded|hardware|linux|firmware|devops|sre|cloud\s+ops)\b/i.test(t);
   if (
     !isNonTechnicalLead &&
-    (/\b(tech\s+lead|technical\s+lead|lead\s+engineer|lead\s+developer|lead\s+software\s+engineer|lead\s+full\s*stack|lead\s+frontend)\b/i.test(t) ||
-      (/\b(team\s+lead)\b/i.test(t) && /\b(software|engineering|developer|frontend|backend|cloud|qa|tech|dev|platform)\b/i.test(combined)))
+    !isSystemsOrBackendLead &&
+    (/\b(tech\s+lead|technical\s+lead|lead\s+frontend|lead\s+ui|lead\s+web)\b/i.test(t) ||
+      (/\b(lead\s+engineer|lead\s+developer|lead\s+software\s+engineer|lead\s+full\s*stack)\b/i.test(t) && !/\b(rust|c\+\+|embedded)\b/i.test(t)) ||
+      (/\b(team\s+lead)\b/i.test(t) && /\b(software|engineering|developer|frontend|tech|dev)\b/i.test(combined) && !isSystemsOrBackendLead))
   ) {
     families.push("TECHNICAL_LEAD");
     evidence.push(`Title matches Technical Lead: "${title}"`);
@@ -156,11 +243,11 @@ export function classifyRoleFamily(
     evidence.push(`Title matches Data & AI role: "${title}"`);
   }
 
-  // 14. SOFTWARE_ENGINEERING (includes QA Engineer, SDET, General Dev)
+  // 14. SOFTWARE_ENGINEERING (includes QA Engineer, SDET, General Dev, Rust/Systems)
   if (
-    /\b(qa\s+engineer|quality\s+assurance|test\s+engineer|sdet|test\s+automation|software\s+developer|software\s+engineer|full-?stack\s+engineer|backend\s+engineer|application\s+developer)\b/i.test(
+    (/\b(qa\s+engineer|quality\s+assurance|test\s+engineer|sdet|test\s+automation|software\s+developer|software\s+engineer|full-?stack\s+engineer|backend\s+engineer|application\s+developer|rust\s+engineering\s+lead)\b/i.test(
       t
-    ) &&
+    ) || isSystemsOrBackendLead) &&
     !families.some((f) => [
       "FRONTEND_ARCHITECT",
       "TECHNICAL_ARCHITECT",
@@ -173,12 +260,12 @@ export function classifyRoleFamily(
     ].includes(f))
   ) {
     families.push("SOFTWARE_ENGINEERING");
-    evidence.push(`Title matches Software / Testing Engineering: "${title}"`);
+    evidence.push(`Title matches Software / Engineering: "${title}"`);
   }
 
   // Check description hints if title was ambiguous
   if (families.length === 0) {
-    if (/\b(technical\s+lead|tech\s+lead)\b/i.test(combined)) {
+    if (/\b(technical\s+lead|tech\s+lead)\b/i.test(combined) && !isSystemsOrBackendLead) {
       families.push("TECHNICAL_LEAD");
       evidence.push("Description indicates Technical Lead responsibilities");
     } else if (/\b(software\s+architect|system\s+architect)\b/i.test(combined)) {
@@ -188,7 +275,7 @@ export function classifyRoleFamily(
       families.push("SOLUTIONS_ARCHITECT");
       evidence.push("Description indicates Solutions Architect responsibilities");
     } else if (/\b(senior\s+software\s+engineer|staff\s+software\s+engineer|principal\s+software\s+engineer)\b/i.test(t)) {
-      families.push("TECHNICAL_LEAD");
+      families.push("SOFTWARE_ENGINEERING");
       evidence.push(`Staff/Principal software engineering role: "${title}"`);
     } else {
       families.push("OTHER");
@@ -204,6 +291,21 @@ export function classifyRoleFamily(
     secondary,
     evidence,
   };
+}
+
+export function formatRoleTier(tier: RoleTier): string {
+  switch (tier) {
+    case "TIER_1":
+      return "Tier 1 (Core Target Architect / Sr Frontend)";
+    case "TIER_2":
+      return "Tier 2 (Consulting / Solutions / Full Stack)";
+    case "TIER_3":
+      return "Tier 3 (Generalist Sr/Staff/Principal)";
+    case "TIER_4":
+      return "Tier 4 (Backend / Cloud / DevOps / Data / AI)";
+    case "TIER_5":
+      return "Tier 5 (Unrelated / Non-Technical)";
+  }
 }
 
 export function formatRoleFamily(role: RoleFamily): string {

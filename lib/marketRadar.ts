@@ -318,10 +318,13 @@ export function matchesRadarSection(job: Job, section: MarketRadarSection): bool
       );
 
     case "REMOTE_GLOBAL":
-      // D. Remote Global: Global remote or worldwide remote
+      // D. Remote Global: Global remote, multi-region remote, or worldwide remote
       return (
+        job.market === "MULTI_REGION_REMOTE" ||
+        job.market === "GLOBAL_REMOTE" ||
         job.travel.type === "REMOTE_GLOBAL" ||
         job.normalizedLocation === "REMOTE_GLOBAL" ||
+        job.normalizedLocation === "MULTI_REGION" ||
         (job.remoteType === "REMOTE" && job.isIndiaEligible)
       );
 
@@ -395,7 +398,31 @@ export function sortMarketRadarJobs(
 ): Job[] {
   return [...jobs].sort((a, b) => {
     if (sortBy === "international") {
-      // 1. Bucket: PRIORITY (4) > ACTIVE (3) > WATCH (2) > NOT_INTERNATIONAL (1)
+      // 1. Career fit FIRST (Section 15: International must not override career fit)
+      const getFitRank = (j: Job) => {
+        const bkt = j.careerFit || j.match?.relevanceBucket;
+        if (bkt === "HIGH_RELEVANCE") return 4;
+        if (bkt === "RELEVANT") return 3;
+        if (bkt === "POSSIBLE") return 2;
+        return 1;
+      };
+      const fitDiff = getFitRank(b) - getFitRank(a);
+      if (fitDiff !== 0) return fitDiff;
+
+      // 2. Role Tier
+      const getTierRank = (j: Job) => {
+        const tier = j.roleTier || j.match?.roleTier;
+        if (tier === "TIER_1") return 5;
+        if (tier === "TIER_2") return 4;
+        if (tier === "TIER_3") return 3;
+        if (tier === "TIER_4") return 2;
+        if (tier === "TIER_5") return 1;
+        return 2;
+      };
+      const tierDiff = getTierRank(b) - getTierRank(a);
+      if (tierDiff !== 0) return tierDiff;
+
+      // 3. Bucket: PRIORITY (4) > ACTIVE (3) > WATCH (2) > NOT_INTERNATIONAL (1)
       const getBucketWeight = (j: Job) => {
         const bkt = j.internationalOpportunity?.bucket;
         if (bkt === "INTERNATIONAL_PRIORITY") return 4;
@@ -406,19 +433,14 @@ export function sortMarketRadarJobs(
       const bktDiff = getBucketWeight(b) - getBucketWeight(a);
       if (bktDiff !== 0) return bktDiff;
 
-      // 2. International opportunity score
+      // 4. International opportunity score
       const scoreDiff = (b.internationalOpportunity?.score || 0) - (a.internationalOpportunity?.score || 0);
       if (scoreDiff !== 0) return scoreDiff;
 
-      // 3. Career fit tie-breaker
-      const getFitRank = (j: Job) => {
-        const bkt = j.careerFit || j.match?.relevanceBucket;
-        if (bkt === "HIGH_RELEVANCE") return 4;
-        if (bkt === "RELEVANT") return 3;
-        if (bkt === "POSSIBLE") return 2;
-        return 1;
-      };
-      return getFitRank(b) - getFitRank(a);
+      // 5. Freshness
+      const bTime = b.postedAt ? new Date(b.postedAt).getTime() : new Date(b.discoveredAt).getTime();
+      const aTime = a.postedAt ? new Date(a.postedAt).getTime() : new Date(a.discoveredAt).getTime();
+      return bTime - aTime;
     }
 
     if (sortBy === "clientFacing") {
@@ -438,8 +460,9 @@ export function sortMarketRadarJobs(
 
     if (sortBy === "market") {
       const getMarketRank = (j: Job) => {
-        if (j.market === "INDIA") return 5;
-        if (j.market === "EMEA") return 4;
+        if (j.market === "INDIA") return 6;
+        if (j.market === "EMEA") return 5;
+        if (j.market === "MULTI_REGION_REMOTE") return 4;
         if (j.market === "GLOBAL_REMOTE") return 3;
         if (j.market === "NORTH_AMERICA") return 2;
         if (j.market === "APAC") return 1;
@@ -451,7 +474,7 @@ export function sortMarketRadarJobs(
     }
 
     if (sortBy === "relevance") {
-      // 1. Opportunity Priority: PRIORITY (4) > ACTIVE (3) > WATCH (2) > LOW (1)
+      // 1. Opportunity Priority Bucket (PRIORITY > ACTIVE > WATCH > LOW)
       const getPriorityWeight = (j: Job) => {
         const p = getOpportunityPriority(j);
         if (p === "PRIORITY") return 4;
@@ -459,21 +482,20 @@ export function sortMarketRadarJobs(
         if (p === "WATCH") return 2;
         return 1;
       };
-      const pDiff = getPriorityWeight(b) - getPriorityWeight(a);
-      if (pDiff !== 0) return pDiff;
+      const prioDiff = getPriorityWeight(b) - getPriorityWeight(a);
+      if (prioDiff !== 0) return prioDiff;
 
-      // Within each bucket:
-      // A. Freshest first (FRESH > RECENT > OLDER > UNKNOWN)
+      // 2. Freshness within priority bucket (FRESH > RECENT > OLDER > UNKNOWN)
       const getFreshRank = (j: Job) => {
-        if (j.freshness === "FRESH") return 4;
-        if (j.freshness === "RECENT") return 3;
-        if (j.freshness === "OLDER") return 2;
-        return 1;
+        if (j.freshness === "FRESH") return 3;
+        if (j.freshness === "RECENT") return 2;
+        if (j.freshness === "OLDER") return 1;
+        return 0;
       };
       const freshDiff = getFreshRank(b) - getFreshRank(a);
       if (freshDiff !== 0) return freshDiff;
 
-      // B. Then strongest Career Fit (HIGH_RELEVANCE > RELEVANT > POSSIBLE > LOW_RELEVANCE)
+      // 3. Career Fit (HIGH_RELEVANCE > RELEVANT > POSSIBLE > LOW_RELEVANCE)
       const getFitRank = (j: Job) => {
         const bkt = j.careerFit || j.match?.relevanceBucket;
         if (bkt === "HIGH_RELEVANCE") return 4;
@@ -484,34 +506,85 @@ export function sortMarketRadarJobs(
       const fitDiff = getFitRank(b) - getFitRank(a);
       if (fitDiff !== 0) return fitDiff;
 
-      // C. Then Hyderabad
-      const aHyd = a.normalizedLocation === "HYDERABAD" ? 1 : 0;
-      const bHyd = b.normalizedLocation === "HYDERABAD" ? 1 : 0;
-      if (bHyd !== aHyd) return bHyd - aHyd;
+      // 4. Target Role Tier (TIER 1 > TIER 2 > TIER 3 > TIER 4 > TIER 5)
+      const getTierRank = (j: Job) => {
+        const tier = j.roleTier || j.match?.roleTier;
+        if (tier === "TIER_1") return 5;
+        if (tier === "TIER_2") return 4;
+        if (tier === "TIER_3") return 3;
+        if (tier === "TIER_4") return 2;
+        if (tier === "TIER_5") return 1;
+        return 2;
+      };
+      const tierDiff = getTierRank(b) - getTierRank(a);
+      if (tierDiff !== 0) return tierDiff;
 
-      // D. Then India
-      const aInd = a.isIndiaEligible ? 1 : 0;
-      const bInd = b.isIndiaEligible ? 1 : 0;
-      if (bInd !== aInd) return bInd - aInd;
+      // 5. Seniority
+      const getSeniorityRank = (j: Job) => {
+        const s = j.seniority;
+        if (s === "ARCHITECT") return 7;
+        if (s === "PRINCIPAL") return 6;
+        if (s === "STAFF") return 5;
+        if (s === "LEAD") return 4;
+        if (s === "SENIOR") return 3;
+        if (s === "MID") return 2;
+        if (s === "ENTRY") return 1;
+        return 0;
+      };
+      const senDiff = getSeniorityRank(b) - getSeniorityRank(a);
+      if (senDiff !== 0) return senDiff;
 
-      // E. Then Remote India
-      const aRemInd = a.normalizedLocation === "REMOTE_INDIA" ? 1 : 0;
-      const bRemInd = b.normalizedLocation === "REMOTE_INDIA" ? 1 : 0;
-      if (bRemInd !== aRemInd) return bRemInd - aRemInd;
+      // 6. Primary Technology Match count
+      const getPrimaryTechCount = (j: Job) =>
+        j.primaryTechnologiesMatched?.length ??
+        (j.match?.primaryTechnologiesMatched?.length || 0);
+      const techDiff = getPrimaryTechCount(b) - getPrimaryTechCount(a);
+      if (techDiff !== 0) return techDiff;
 
-      // F. Then Global Remote
-      const isGlobRem = (j: Job) =>
-        j.normalizedLocation === "REMOTE_GLOBAL" || j.travel?.type === "REMOTE_GLOBAL" ? 1 : 0;
-      const aGlobRem = isGlobRem(a);
-      const bGlobRem = isGlobRem(b);
-      if (bGlobRem !== aGlobRem) return bGlobRem - aGlobRem;
+      // 7. Primary Domain Match count
+      const getDomainCount = (j: Job) => j.domains?.length || 0;
+      const domainDiff = getDomainCount(b) - getDomainCount(a);
+      if (domainDiff !== 0) return domainDiff;
 
-      // G. Then other locations / timestamp
+      // 8. Client Facing
+      const aCF = a.clientFacing === "YES" ? 1 : 0;
+      const bCF = b.clientFacing === "YES" ? 1 : 0;
+      if (bCF !== aCF) return bCF - aCF;
+
+      // 9. India Location / Eligibility
+      const getIndiaRank = (j: Job) => {
+        if (j.normalizedLocation === "HYDERABAD") return 4;
+        if (j.normalizedLocation === "REMOTE_INDIA") return 3;
+        if (j.isIndiaEligible) return 2;
+        if (j.normalizedLocation === "REMOTE_GLOBAL" || j.market === "GLOBAL_REMOTE" || j.market === "MULTI_REGION_REMOTE") return 1;
+        return 0;
+      };
+      const indiaDiff = getIndiaRank(b) - getIndiaRank(a);
+      if (indiaDiff !== 0) return indiaDiff;
+
+      // 10. International Customer Exposure
+      const getIntlExposureRank = (j: Job) => {
+        const exp = j.internationalExposure?.exposure;
+        if (exp === "INTERNATIONAL_CUSTOMERS" || exp === "CLIENT_SITE_TRAVEL" || exp === "INTERNATIONAL_TRAVEL") return 2;
+        if (exp === "INTERNATIONAL_TEAM") return 1;
+        return 0;
+      };
+      const expDiff = getIntlExposureRank(b) - getIntlExposureRank(a);
+      if (expDiff !== 0) return expDiff;
+
+      // 11. International Travel
+      const getTravelRank = (j: Job) => {
+        if (j.travel?.type === "INTERNATIONAL_TRAVEL" || j.travel?.type === "CLIENT_SITE_TRAVEL") return 2;
+        if (j.travel?.type === "REMOTE_GLOBAL") return 1;
+        return 0;
+      };
+      const travelDiff = getTravelRank(b) - getTravelRank(a);
+      if (travelDiff !== 0) return travelDiff;
+
+      // 12. Fallback: timestamp
       const bTime = b.postedAt ? new Date(b.postedAt).getTime() : new Date(b.discoveredAt).getTime();
       const aTime = a.postedAt ? new Date(a.postedAt).getTime() : new Date(a.discoveredAt).getTime();
-      if (bTime !== aTime) return bTime - aTime;
-
-      return a.location.localeCompare(b.location);
+      return bTime - aTime;
     }
 
     if (sortBy === "freshest") {

@@ -236,8 +236,11 @@ export class JobIngestionService {
             actualJobTechnologies: actualTechnologies,
             matchedTargetTechnologies: matchedTargets,
             technologyMatchDetails: match.breakdown.technologyMatch.details || [],
+            primaryTechnologiesMatched: match.primaryTechnologiesMatched || [],
+            secondaryTechnologiesMatched: match.secondaryTechnologiesMatched || [],
             roleFamily: roleClassification.primary,
             secondaryRoleFamilies: roleClassification.secondary,
+            roleTier: match.roleTier,
             domains: match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER" && d.strength !== "WEAK").map((d) => d.domain),
             secondaryEvidenceDomains: match.secondaryEvidenceDomains || match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER" && d.strength === "WEAK").map((d) => d.domain),
             domainMatches: match.domainMatches,
@@ -247,6 +250,7 @@ export class JobIngestionService {
 
             // Phase 7: Global & EMEA Opportunity Model
             market: marketResult.market,
+            regions: marketResult.regions,
             emeaCountry: marketResult.emeaCountry,
             opportunityType: oppTypeResult.primary,
             opportunityTypes: oppTypeResult.types,
