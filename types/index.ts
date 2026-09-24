@@ -1,4 +1,4 @@
-export type JobStatus =
+export type ApplicationStatus =
   | "DISCOVERED"
   | "SAVED"
   | "APPLIED"
@@ -7,7 +7,10 @@ export type JobStatus =
   | "FINAL"
   | "OFFER"
   | "REJECTED"
-  | "IGNORED";
+  | "IGNORED"
+  | "WITHDRAWN";
+
+export type JobStatus = ApplicationStatus;
 
 export type RemoteType = "REMOTE" | "HYBRID" | "ONSITE";
 
@@ -414,4 +417,53 @@ export interface JobFiltersState {
   sortBy: "relevance" | "freshest" | "newest" | "travel" | "location" | "salary";
   section?: MarketRadarSection;
   opportunityPriority?: string;
+  applicationTrackingFilter?: "ALL" | "SAVED" | "APPLIED" | "NEEDS_FOLLOW_UP";
+}
+
+export interface Application {
+  id: string;
+  jobId: string;
+  status: ApplicationStatus;
+  createdAt: string;
+  updatedAt: string;
+  savedAt?: string;
+  appliedAt?: string;
+  lastActivityAt: string;
+  nextFollowUpAt?: string;
+  resumeVersion?: string;
+  coverLetterUsed?: string;
+  referral?: boolean;
+  referralName?: string;
+  recruiterName?: string;
+  recruiterEmail?: string;
+  recruiterLinkedIn?: string;
+  salaryOffered?: number;
+  salaryExpected?: number;
+  salaryCurrency?: string;
+  noticePeriodDiscussed?: string;
+  interviewDates?: string[];
+  notes?: string;
+  rejectionReason?: string;
+  withdrawalReason?: string;
+  source?: string;
+  applicationUrl?: string;
+}
+
+export interface ApplicationFunnelMetrics {
+  totalApplications: number;
+  saved: number;
+  applied: number;
+  screening: number;
+  technical: number;
+  final: number;
+  offers: number;
+  rejected: number;
+  withdrawn: number;
+  ignored: number;
+  followUpsDue: number;
+  // Funnel conversion percentages (0 to 100 or null if denominator is 0)
+  appliedToScreeningConversion: number | null;
+  screeningToTechnicalConversion: number | null;
+  technicalToFinalConversion: number | null;
+  finalToOfferConversion: number | null;
 }

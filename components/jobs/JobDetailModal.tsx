@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { Job } from "@/types";
+import type { Application, Job } from "@/types";
 import { formatRoleFamily } from "@/lib/roleClassifier";
 import { formatSeniorityLevel } from "@/lib/seniorityDetector";
 import { formatDomainName } from "@/lib/domainMatcher";
@@ -9,6 +9,7 @@ import { getDataQualityNotices, getOpportunityPriority, getOpportunityPriorityRe
 
 interface JobDetailModalProps {
   job: Job | null;
+  application?: Application;
   onClose: () => void;
   onSave?: (job: Job) => void;
   onApply?: (job: Job) => void;
@@ -16,6 +17,7 @@ interface JobDetailModalProps {
 
 export function JobDetailModal({
   job,
+  application,
   onClose,
   onSave,
   onApply,
@@ -421,25 +423,24 @@ export function JobDetailModal({
               <button
                 onClick={() => onSave(job)}
                 className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
-                  job.status === "SAVED"
-                    ? "border-cyan-500 bg-cyan-500/10 text-cyan-300"
+                  application?.status === "SAVED" || (!application && job.status === "SAVED")
+                    ? "border-cyan-500 bg-cyan-500/15 text-cyan-300 font-bold"
                     : "border-slate-700 bg-slate-800 text-slate-300 hover:text-white"
                 }`}
               >
-                {job.status === "SAVED" ? "★ Saved in Radar" : "☆ Save Job"}
+                {application?.status === "SAVED" || (!application && job.status === "SAVED")
+                  ? "✓ Saved"
+                  : "☆ Save Job"}
               </button>
             )}
 
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
               onClick={() => onApply?.(job)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-indigo-500 transition"
             >
-              <span>🚀 Open Original Vacancy</span>
+              <span>🚀 Apply</span>
               <span>↗</span>
-            </a>
+            </button>
           </div>
         </div>
       </div>

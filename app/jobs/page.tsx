@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CareerDomain, Job, JobFiltersState, JobStatus, MarketRadarSection, ProviderStatus } from "@/types";
+import Link from "next/link";
+import type { Application, CareerDomain, Job, JobFiltersState, JobStatus, MarketRadarSection, ProviderStatus } from "@/types";
 import { getStoredJobs, saveJobs, updateJobStatusInStorage } from "@/lib/storage";
+import {
+  applyToJobAsApplication,
+  getApplications,
+  isFollowUpDue,
+  saveJobAsApplication,
+} from "@/lib/applicationStore";
 import { JobCard } from "@/components/jobs/JobCard";
 import { JobFilters } from "@/components/jobs/JobFilters";
 import { JobDetailModal } from "@/components/jobs/JobDetailModal";
@@ -37,10 +44,12 @@ const initialFilters: JobFiltersState = {
   sortBy: "relevance",
   section: "ALL",
   opportunityPriority: "ALL",
+  applicationTrackingFilter: "ALL",
 };
 
 export default function MarketRadarPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [applicationsMap, setApplicationsMap] = useState<Map<string, Application>>(new Map());
   const [filters, setFilters] = useState<JobFiltersState>(initialFilters);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -48,30 +57,42 @@ export default function MarketRadarPage() {
   const [showCoveragePanel, setShowCoveragePanel] = useState(false);
   const [latestProviders, setLatestProviders] = useState<ProviderStatus[]>([]);
 
+  function refreshApplications() {
+    const apps = getApplications();
+    const map = new Map<string, Application>();
+    apps.forEach((a) => map.set(a.jobId, a));
+    setApplicationsMap(map);
+  }
+
   useEffect(() => {
     const stored = getStoredJobs();
     const currentMs = Date.now();
     queueMicrotask(() => {
       setNowTimestamp(currentMs);
       setJobs(stored);
+      refreshApplications();
       setMounted(true);
     });
+
+    window.addEventListener("job-market-radar:applications-updated", refreshApplications);
+    return () => {
+      window.removeEventListener("job-market-radar:applications-updated", refreshApplications);
+    };
   }, []);
 
   function handleSave(job: Job) {
-    const nextStatus: JobStatus = job.status === "SAVED" ? "DISCOVERED" : "SAVED";
-    const updated = updateJobStatusInStorage(job.id, nextStatus);
-    setJobs(updated);
-    if (selectedJob && selectedJob.id === job.id) {
-      setSelectedJob({ ...selectedJob, status: nextStatus });
+    const existing = applicationsMap.get(job.id);
+    if (!existing) {
+      const app = saveJobAsApplication(job);
+      setApplicationsMap((prev) => new Map(prev).set(job.id, app));
     }
   }
 
   function handleApply(job: Job) {
-    const updated = updateJobStatusInStorage(job.id, "APPLIED");
-    setJobs(updated);
-    if (selectedJob && selectedJob.id === job.id) {
-      setSelectedJob({ ...selectedJob, status: "APPLIED" });
+    const app = applyToJobAsApplication(job);
+    setApplicationsMap((prev) => new Map(prev).set(job.id, app));
+    if (job.url) {
+      window.open(job.url, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -144,6 +165,18 @@ export default function MarketRadarPage() {
           (job.notes && job.notes.toLowerCase().includes(q));
 
         if (!matchesSearch) return false;
+      }
+
+      // Application Pipeline Filter (All / Saved / Applied / Needs Follow-up)
+      if (filters.applicationTrackingFilter === "SAVED") {
+        const app = applicationsMap.get(job.id);
+        if (!app || app.status !== "SAVED") return false;
+      } else if (filters.applicationTrackingFilter === "APPLIED") {
+        const app = applicationsMap.get(job.id);
+        if (!app || app.status === "SAVED" || app.status === "DISCOVERED") return false;
+      } else if (filters.applicationTrackingFilter === "NEEDS_FOLLOW_UP") {
+        const app = applicationsMap.get(job.id);
+        if (!app || !isFollowUpDue(app)) return false;
       }
 
       // Career Fit / Relevance Bucket Filter
@@ -270,7 +303,7 @@ export default function MarketRadarPage() {
 
     // Deterministic explainable sorting
     return sortMarketRadarJobs(baseFiltered, filters.sortBy);
-  }, [jobs, filters, nowTimestamp]);
+  }, [jobs, filters, nowTimestamp, applicationsMap]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 space-y-6">
@@ -417,6 +450,46 @@ export default function MarketRadarPage() {
         </section>
       )}
 
+      {/* APPLICATION PIPELINE QUICK FILTER STRIP */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+            Pipeline Views:
+          </span>
+          {[
+            { id: "ALL", label: "All Jobs" },
+            { id: "SAVED", label: "Saved" },
+            { id: "APPLIED", label: "Applied" },
+            { id: "NEEDS_FOLLOW_UP", label: "Needs Follow-up" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  applicationTrackingFilter: tab.id as "ALL" | "SAVED" | "APPLIED" | "NEEDS_FOLLOW_UP",
+                }))
+              }
+              className={`rounded-xl px-3 py-1.5 font-semibold text-xs transition ${
+                (filters.applicationTrackingFilter || "ALL") === tab.id
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <Link
+          href="/applications"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:underline"
+        >
+          <span>Open Application Pipeline</span>
+          <span>→</span>
+        </Link>
+      </div>
+
       {/* FILTERS CONTROL PANEL */}
       <JobFilters
         filters={filters}
@@ -435,6 +508,7 @@ export default function MarketRadarPage() {
           <JobCard
             key={job.id}
             job={job}
+            application={applicationsMap.get(job.id)}
             onSelect={(j) => setSelectedJob(j)}
             onSave={handleSave}
             onApply={handleApply}
@@ -463,6 +537,7 @@ export default function MarketRadarPage() {
       {/* JOB DETAIL MODAL */}
       <JobDetailModal
         job={selectedJob}
+        application={selectedJob ? applicationsMap.get(selectedJob.id) : undefined}
         onClose={() => setSelectedJob(null)}
         onSave={handleSave}
         onApply={handleApply}

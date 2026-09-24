@@ -1,14 +1,16 @@
 "use client";
 
-import type { Job } from "@/types";
+import type { Application, Job } from "@/types";
 import { useState } from "react";
 import { formatRoleFamily } from "@/lib/roleClassifier";
 import { formatSeniorityLevel } from "@/lib/seniorityDetector";
 import { formatDomainName } from "@/lib/domainMatcher";
 import { getDataQualityNotices, getOpportunityPriority, getOpportunityPriorityReasons } from "@/lib/marketRadar";
+import { isFollowUpDue } from "@/lib/applicationStore";
 
 interface JobCardProps {
   job: Job;
+  application?: Application;
   onSelect?: (job: Job) => void;
   onSave?: (job: Job) => void;
   onApply?: (job: Job) => void;
@@ -18,6 +20,7 @@ interface JobCardProps {
 
 export function JobCard({
   job,
+  application,
   onSelect,
   onSave,
   onApply,
@@ -215,10 +218,41 @@ export function JobCard({
                 </span>
               )}
 
-              {/* Status Badge */}
-              <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
-                {job.status}
-              </span>
+              {/* Application Pipeline Status Badge */}
+              {application ? (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                    application.status === "SAVED"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                      : application.status === "APPLIED"
+                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
+                      : application.status === "SCREENING"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                      : application.status === "TECHNICAL"
+                      ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                      : application.status === "FINAL"
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                      : application.status === "OFFER"
+                      ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/50"
+                      : application.status === "REJECTED"
+                      ? "bg-red-500/20 text-red-300 border-red-500/30"
+                      : "bg-slate-800 text-slate-400 border-slate-700"
+                  }`}
+                >
+                  {application.status}
+                </span>
+              ) : job.status !== "DISCOVERED" ? (
+                <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
+                  {job.status}
+                </span>
+              ) : null}
+
+              {/* Follow-up Due Badge */}
+              {application && isFollowUpDue(application) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold animate-pulse">
+                  ⏰ Follow-up Due
+                </span>
+              )}
             </div>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-slate-300 font-medium">
@@ -449,24 +483,23 @@ export function JobCard({
           <button
             onClick={() => onSave?.(job)}
             className={`w-full rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
-              job.status === "SAVED"
-                ? "border-cyan-500 bg-cyan-500/10 text-cyan-300"
+              application?.status === "SAVED" || (!application && job.status === "SAVED")
+                ? "border-cyan-500 bg-cyan-500/15 text-cyan-300 font-bold"
                 : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
             }`}
           >
-            {job.status === "SAVED" ? "★ Saved in Radar" : "☆ Save Job"}
+            {application?.status === "SAVED" || (!application && job.status === "SAVED")
+              ? "✓ Saved"
+              : "☆ Save Job"}
           </button>
 
-          {/* Apply / Open Job */}
-          <a
-            href={job.url}
-            target="_blank"
-            rel="noopener noreferrer"
+          {/* Apply Action */}
+          <button
             onClick={() => onApply?.(job)}
             className="w-full text-center rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:from-cyan-400 hover:to-indigo-500 transition"
           >
-            🚀 Apply / Open
-          </a>
+            🚀 Apply
+          </button>
 
           {/* Mark as Applied */}
           {job.status !== "APPLIED" && (
