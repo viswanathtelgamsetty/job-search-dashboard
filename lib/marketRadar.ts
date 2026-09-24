@@ -1,4 +1,77 @@
-import type { CareerDomain, Job, JobFiltersState, MarketRadarMetrics, MarketRadarSection } from "@/types";
+import type {
+  CareerDomain,
+  FreshnessStatus,
+  Job,
+  JobFiltersState,
+  MarketRadarMetrics,
+  MarketRadarSection,
+  OpportunityPriority,
+  RelevanceBucket,
+} from "@/types";
+
+/**
+ * Deterministically determines opportunity priority:
+ * - PRIORITY: High/Relevant career fit + Fresh/Recent posting
+ * - ACTIVE: High/Relevant career fit + Older posting
+ * - WATCH: Possible career fit + Fresh/Recent posting
+ * - LOW: Possible or Low career fit + Older posting (or Low career fit overall)
+ */
+export function calculateOpportunityPriority(
+  careerFit: RelevanceBucket,
+  freshness: FreshnessStatus
+): OpportunityPriority {
+  const isHighOrRelevant = careerFit === "HIGH_RELEVANCE" || careerFit === "RELEVANT";
+  const isFreshOrRecent = freshness === "FRESH" || freshness === "RECENT";
+
+  if (isHighOrRelevant) {
+    return isFreshOrRecent ? "PRIORITY" : "ACTIVE";
+  }
+
+  if (careerFit === "POSSIBLE") {
+    return isFreshOrRecent ? "WATCH" : "LOW";
+  }
+
+  // LOW_RELEVANCE
+  return "LOW";
+}
+
+/**
+ * Deterministic explanation reasons for opportunity priority.
+ */
+export function getOpportunityPriorityReasons(
+  careerFit: RelevanceBucket,
+  freshness: FreshnessStatus
+): string[] {
+  const isHighOrRelevant = careerFit === "HIGH_RELEVANCE" || careerFit === "RELEVANT";
+  const isFreshOrRecent = freshness === "FRESH" || freshness === "RECENT";
+
+  if (isHighOrRelevant && isFreshOrRecent) {
+    return ["Strong career fit", "Recently posted"];
+  }
+  if (isHighOrRelevant && !isFreshOrRecent) {
+    return ["Strong career fit", freshness === "UNKNOWN" ? "Posting date unknown" : "Older posting"];
+  }
+  if (careerFit === "POSSIBLE" && isFreshOrRecent) {
+    return ["Possible career fit", "Recently posted"];
+  }
+  if (careerFit === "POSSIBLE" && !isFreshOrRecent) {
+    return ["Possible career fit", freshness === "UNKNOWN" ? "Posting date unknown" : "Older posting"];
+  }
+  return [
+    "Lower career fit",
+    isFreshOrRecent ? "Recently posted" : freshness === "UNKNOWN" ? "Posting date unknown" : "Older posting",
+  ];
+}
+
+/**
+ * Helper to obtain the derived opportunity priority for a job.
+ */
+export function getOpportunityPriority(job: Job): OpportunityPriority {
+  if (job.opportunityPriority) return job.opportunityPriority;
+  const fit = job.careerFit || job.match?.relevanceBucket || "LOW_RELEVANCE";
+  const freshness = job.freshness || "UNKNOWN";
+  return calculateOpportunityPriority(fit, freshness);
+}
 
 export interface CareerLaneConfig {
   key: CareerDomain;
@@ -127,6 +200,19 @@ export function calculateMarketRadarMetrics(jobs: Job[]): MarketRadarMetrics {
   const freshJobs = liveJobs.filter((j) => j.freshness === "FRESH").length;
   const recentJobs = liveJobs.filter((j) => j.freshness === "RECENT").length;
 
+  const priorityOpportunities = liveJobs.filter(
+    (j) => getOpportunityPriority(j) === "PRIORITY"
+  ).length;
+  const activeOpportunities = liveJobs.filter(
+    (j) => getOpportunityPriority(j) === "ACTIVE"
+  ).length;
+  const watchOpportunities = liveJobs.filter(
+    (j) => getOpportunityPriority(j) === "WATCH"
+  ).length;
+  const lowOpportunities = liveJobs.filter(
+    (j) => getOpportunityPriority(j) === "LOW"
+  ).length;
+
   return {
     totalJobs,
     highRelevance,
@@ -143,6 +229,10 @@ export function calculateMarketRadarMetrics(jobs: Job[]): MarketRadarMetrics {
     relocation,
     freshJobs,
     recentJobs,
+    priorityOpportunities,
+    activeOpportunities,
+    watchOpportunities,
+    lowOpportunities,
   };
 }
 
@@ -241,35 +331,67 @@ export function sortMarketRadarJobs(
 ): Job[] {
   return [...jobs].sort((a, b) => {
     if (sortBy === "relevance") {
-      // 1. Career Fit bucket rank: HIGH_RELEVANCE (4) > RELEVANT (3) > POSSIBLE (2) > LOW_RELEVANCE (1)
-      const getRank = (j: Job) => {
+      // 1. Opportunity Priority: PRIORITY (4) > ACTIVE (3) > WATCH (2) > LOW (1)
+      const getPriorityWeight = (j: Job) => {
+        const p = getOpportunityPriority(j);
+        if (p === "PRIORITY") return 4;
+        if (p === "ACTIVE") return 3;
+        if (p === "WATCH") return 2;
+        return 1;
+      };
+      const pDiff = getPriorityWeight(b) - getPriorityWeight(a);
+      if (pDiff !== 0) return pDiff;
+
+      // Within each bucket:
+      // A. Freshest first (FRESH > RECENT > OLDER > UNKNOWN)
+      const getFreshRank = (j: Job) => {
+        if (j.freshness === "FRESH") return 4;
+        if (j.freshness === "RECENT") return 3;
+        if (j.freshness === "OLDER") return 2;
+        return 1;
+      };
+      const freshDiff = getFreshRank(b) - getFreshRank(a);
+      if (freshDiff !== 0) return freshDiff;
+
+      // B. Then strongest Career Fit (HIGH_RELEVANCE > RELEVANT > POSSIBLE > LOW_RELEVANCE)
+      const getFitRank = (j: Job) => {
         const bkt = j.careerFit || j.match?.relevanceBucket;
         if (bkt === "HIGH_RELEVANCE") return 4;
         if (bkt === "RELEVANT") return 3;
         if (bkt === "POSSIBLE") return 2;
         return 1;
       };
-      const rankDiff = getRank(b) - getRank(a);
-      if (rankDiff !== 0) return rankDiff;
+      const fitDiff = getFitRank(b) - getFitRank(a);
+      if (fitDiff !== 0) return fitDiff;
 
-      // 2. Primary target location (Hyderabad first)
+      // C. Then Hyderabad
       const aHyd = a.normalizedLocation === "HYDERABAD" ? 1 : 0;
       const bHyd = b.normalizedLocation === "HYDERABAD" ? 1 : 0;
       if (bHyd !== aHyd) return bHyd - aHyd;
 
-      // 3. India eligibility
+      // D. Then India
       const aInd = a.isIndiaEligible ? 1 : 0;
       const bInd = b.isIndiaEligible ? 1 : 0;
       if (bInd !== aInd) return bInd - aInd;
 
-      // 4. Number of matched target technologies
-      const aTech = a.matchedTargetTechnologies?.length || 0;
-      const bTech = b.matchedTargetTechnologies?.length || 0;
-      if (bTech !== aTech) return bTech - aTech;
+      // E. Then Remote India
+      const aRemInd = a.normalizedLocation === "REMOTE_INDIA" ? 1 : 0;
+      const bRemInd = b.normalizedLocation === "REMOTE_INDIA" ? 1 : 0;
+      if (bRemInd !== aRemInd) return bRemInd - aRemInd;
 
-      // 5. Freshness
-      const freshRank = (j: Job) => (j.freshness === "FRESH" ? 3 : j.freshness === "RECENT" ? 2 : 1);
-      return freshRank(b) - freshRank(a);
+      // F. Then Global Remote
+      const isGlobRem = (j: Job) =>
+        j.normalizedLocation === "REMOTE_GLOBAL" || j.travel?.type === "REMOTE_GLOBAL" ? 1 : 0;
+      const aGlobRem = isGlobRem(a);
+      const bGlobRem = isGlobRem(b);
+      if (bGlobRem !== aGlobRem) return bGlobRem - aGlobRem;
+
+      // G. Then other locations / timestamp
+      const bTime = b.postedAt ? new Date(b.postedAt).getTime() : new Date(b.discoveredAt).getTime();
+      const aTime = a.postedAt ? new Date(a.postedAt).getTime() : new Date(a.discoveredAt).getTime();
+      if (bTime !== aTime) return bTime - aTime;
+
+      return a.location.localeCompare(b.location);
     }
 
     if (sortBy === "freshest") {

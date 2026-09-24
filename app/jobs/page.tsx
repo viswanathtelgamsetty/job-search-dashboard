@@ -7,11 +7,13 @@ import { JobCard } from "@/components/jobs/JobCard";
 import { JobFilters } from "@/components/jobs/JobFilters";
 import { JobDetailModal } from "@/components/jobs/JobDetailModal";
 import { MarketRadarSummary } from "@/components/jobs/MarketRadarSummary";
+import { OpportunityPriorityBar } from "@/components/jobs/OpportunityPriorityBar";
 import { CareerLanesBar } from "@/components/jobs/CareerLanesBar";
 import { MarketRadarSectionTabs } from "@/components/jobs/MarketRadarSectionTabs";
 import { SyncButton } from "@/components/jobs/SyncButton";
 import {
   calculateMarketRadarMetrics,
+  getOpportunityPriority,
   matchesRadarSection,
   sortMarketRadarJobs,
 } from "@/lib/marketRadar";
@@ -34,6 +36,7 @@ const initialFilters: JobFiltersState = {
   postedWithinDays: null,
   sortBy: "relevance",
   section: "ALL",
+  opportunityPriority: "ALL",
 };
 
 export default function MarketRadarPage() {
@@ -245,6 +248,11 @@ export default function MarketRadarPage() {
         if (job.freshness !== filters.freshness) return false;
       }
 
+      // Opportunity Priority Filter
+      if (filters.opportunityPriority && filters.opportunityPriority !== "ALL") {
+        if (getOpportunityPriority(job) !== filters.opportunityPriority) return false;
+      }
+
       // Source
       if (filters.source !== "ALL") {
         if (job.source !== filters.source) return false;
@@ -293,6 +301,13 @@ export default function MarketRadarPage() {
           <SyncButton onSyncComplete={handleSyncComplete} existingJobs={jobs} />
         </div>
       </div>
+
+      {/* OPPORTUNITY ACTION RADAR (Deterministic Priority: PRIORITY, ACTIVE, WATCH, LOW) */}
+      <OpportunityPriorityBar
+        jobs={jobs}
+        selectedPriority={filters.opportunityPriority || "ALL"}
+        onSelectPriority={(p) => setFilters((prev) => ({ ...prev, opportunityPriority: p }))}
+      />
 
       {/* MARKET RADAR SUMMARY (Exact 15 Metrics) */}
       <MarketRadarSummary

@@ -41,6 +41,7 @@ export function JobFilters({
     filters.relevance !== "ALL" ||
     filters.company !== "ALL" ||
     filters.experienceLevel !== "ALL" ||
+    (filters.opportunityPriority && filters.opportunityPriority !== "ALL") ||
     (filters.freshness && filters.freshness !== "ALL") ||
     filters.postedWithinDays !== null;
 
@@ -78,7 +79,7 @@ export function JobFilters({
             aria-label="Sort jobs by"
             className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs text-slate-200 outline-none focus:border-cyan-500 font-medium"
           >
-            <option value="relevance">🎯 Career Fit (High First)</option>
+            <option value="relevance">🎯 Priority Default (Priority &gt; Active &gt; Watch &gt; Low)</option>
             <option value="freshest">🟢 Freshest (Newest Jobs First)</option>
             <option value="newest">🕒 Most Recent (Posted/Discovered)</option>
             <option value="travel">✈️ Travel Opportunity (Intl & Client First)</option>
@@ -86,6 +87,73 @@ export function JobFilters({
             <option value="salary">💰 Highest Salary</option>
           </select>
         </div>
+      </div>
+
+      {/* Opportunity Priority Quick Buttons */}
+      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider mr-1">
+          Opportunity:
+        </span>
+
+        <button
+          onClick={() =>
+            update({
+              opportunityPriority: filters.opportunityPriority === "PRIORITY" ? "ALL" : "PRIORITY",
+            })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            filters.opportunityPriority === "PRIORITY"
+              ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold ring-1 ring-emerald-500/50"
+              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+          }`}
+        >
+          ● Priority
+        </button>
+
+        <button
+          onClick={() =>
+            update({
+              opportunityPriority: filters.opportunityPriority === "ACTIVE" ? "ALL" : "ACTIVE",
+            })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            filters.opportunityPriority === "ACTIVE"
+              ? "border-cyan-500 bg-cyan-500/20 text-cyan-300 font-bold"
+              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+          }`}
+        >
+          ○ Active
+        </button>
+
+        <button
+          onClick={() =>
+            update({
+              opportunityPriority: filters.opportunityPriority === "WATCH" ? "ALL" : "WATCH",
+            })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            filters.opportunityPriority === "WATCH"
+              ? "border-amber-500 bg-amber-500/20 text-amber-300 font-bold"
+              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+          }`}
+        >
+          👁 Watch
+        </button>
+
+        <button
+          onClick={() =>
+            update({
+              opportunityPriority: filters.opportunityPriority === "LOW" ? "ALL" : "LOW",
+            })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            filters.opportunityPriority === "LOW"
+              ? "border-slate-500 bg-slate-800 text-slate-200 font-bold"
+              : "border-slate-800 bg-slate-950/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+          }`}
+        >
+          - Low
+        </button>
       </div>
 
       {/* Primary Relevance Quick Buttons */}
@@ -331,7 +399,24 @@ export function JobFilters({
       </div>
 
       {/* Secondary Filter Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 pt-1 border-t border-slate-800/60">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-1 border-t border-slate-800/60">
+        {/* Opportunity Priority */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Priority Action
+          </label>
+          <select
+            value={filters.opportunityPriority || "ALL"}
+            onChange={(e) => update({ opportunityPriority: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500 font-medium"
+          >
+            <option value="ALL">All Priorities</option>
+            <option value="PRIORITY">● Priority</option>
+            <option value="ACTIVE">○ Active</option>
+            <option value="WATCH">👁 Watch</option>
+            <option value="LOW">- Low</option>
+          </select>
+        </div>
         {/* Client-Facing / Consulting */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">

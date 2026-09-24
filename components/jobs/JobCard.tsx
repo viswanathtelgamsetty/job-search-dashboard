@@ -5,7 +5,7 @@ import { useState } from "react";
 import { formatRoleFamily } from "@/lib/roleClassifier";
 import { formatSeniorityLevel } from "@/lib/seniorityDetector";
 import { formatDomainName } from "@/lib/domainMatcher";
-import { getDataQualityNotices } from "@/lib/marketRadar";
+import { getDataQualityNotices, getOpportunityPriority, getOpportunityPriorityReasons } from "@/lib/marketRadar";
 
 interface JobCardProps {
   job: Job;
@@ -28,21 +28,49 @@ export function JobCard({
 
   // Relevance styling
   const bucket = job.careerFit || job.match?.relevanceBucket || "POSSIBLE";
+
+  // Opportunity Priority
+  const priority = getOpportunityPriority(job);
+  const priorityReasons = getOpportunityPriorityReasons(bucket, job.freshness);
+
+  const priorityConfig = {
+    PRIORITY: {
+      label: "OPPORTUNITY: PRIORITY",
+      style: "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-black shadow-sm ring-1 ring-emerald-500/40",
+      dot: "bg-emerald-400 animate-pulse",
+    },
+    ACTIVE: {
+      label: "OPPORTUNITY: ACTIVE",
+      style: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-bold",
+      dot: "bg-cyan-400",
+    },
+    WATCH: {
+      label: "OPPORTUNITY: WATCH",
+      style: "bg-amber-500/15 text-amber-300 border-amber-500/40 font-semibold",
+      dot: "bg-amber-400",
+    },
+    LOW: {
+      label: "OPPORTUNITY: LOW",
+      style: "bg-slate-800 text-slate-400 border-slate-700",
+      dot: "bg-slate-500",
+    },
+  }[priority];
+
   const relevanceConfig = {
     HIGH_RELEVANCE: {
-      label: "🌟 CAREER FIT: HIGH RELEVANCE",
+      label: "CAREER FIT: HIGH",
       style: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40 font-bold",
     },
     RELEVANT: {
-      label: "✨ CAREER FIT: RELEVANT",
+      label: "CAREER FIT: RELEVANT",
       style: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-semibold",
     },
     POSSIBLE: {
-      label: "🔍 CAREER FIT: POSSIBLE",
+      label: "CAREER FIT: POSSIBLE",
       style: "bg-amber-500/15 text-amber-300 border-amber-500/40",
     },
     LOW_RELEVANCE: {
-      label: "CAREER FIT: LOW RELEVANCE",
+      label: "CAREER FIT: LOW",
       style: "bg-slate-800/80 text-slate-400 border-slate-700",
     },
   }[bucket];
@@ -151,9 +179,17 @@ export function JobCard({
                 </button>
               </h3>
 
+              {/* Opportunity Priority Badge (Prominent & Deterministic) */}
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs border ${priorityConfig.style}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${priorityConfig.dot}`} />
+                <span>{priorityConfig.label}</span>
+              </span>
+
               {/* Deterministic Career Fit Badge */}
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs border ${relevanceConfig.style}`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs border ${relevanceConfig.style}`}
               >
                 {relevanceConfig.label}
               </span>
@@ -163,7 +199,7 @@ export function JobCard({
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] border ${freshnessConfig.badge}`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${freshnessConfig.dot}`} />
-                <span>{freshnessConfig.text}</span>
+                <span>FRESHNESS: {freshnessConfig.text}</span>
                 <span className="opacity-80 text-[10px]">({freshnessAgeLabel})</span>
               </span>
 
@@ -199,6 +235,14 @@ export function JobCard({
               <span className="rounded bg-slate-800/80 px-2 py-0.5 text-xs text-slate-400">
                 Source: {job.source}
               </span>
+            </div>
+
+            {/* Deterministic Action Reason */}
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-400">
+              <span className="font-semibold text-slate-300">Action Signal:</span>
+              <span className="text-cyan-300 font-semibold">{priority}</span>
+              <span className="text-slate-600">•</span>
+              <span>{priorityReasons.join(" • ")}</span>
             </div>
 
             {/* Primary Domains Badges */}

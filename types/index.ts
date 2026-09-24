@@ -106,6 +106,8 @@ export type FreshnessStatus =
   | "OLDER"
   | "UNKNOWN";
 
+export type OpportunityPriority = "PRIORITY" | "ACTIVE" | "WATCH" | "LOW";
+
 export type CareerDomain =
   | "FRONTEND"
   | "DIGITAL_EXPERIENCE"
@@ -267,7 +269,9 @@ export interface Job {
   status: JobStatus;
   isDemo?: boolean; // True only for mock/seed data
 
-  // Profile matching
+  // Profile matching & Opportunity Priority
+  opportunityPriority?: OpportunityPriority;
+  opportunityPriorityReasons?: string[];
   match: JobMatchDetails;
 
   // Application tracker details
@@ -384,6 +388,10 @@ export interface MarketRadarMetrics {
   relocation: number;
   freshJobs: number;
   recentJobs: number;
+  priorityOpportunities: number;
+  activeOpportunities: number;
+  watchOpportunities: number;
+  lowOpportunities: number;
 }
 
 export interface JobFiltersState {
@@ -405,4 +413,5 @@ export interface JobFiltersState {
   postedWithinDays: number | null;
   sortBy: "relevance" | "freshest" | "newest" | "travel" | "location" | "salary";
   section?: MarketRadarSection;
+  opportunityPriority?: string;
 }

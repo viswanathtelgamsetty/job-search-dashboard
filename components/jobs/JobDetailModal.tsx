@@ -5,7 +5,7 @@ import type { Job } from "@/types";
 import { formatRoleFamily } from "@/lib/roleClassifier";
 import { formatSeniorityLevel } from "@/lib/seniorityDetector";
 import { formatDomainName } from "@/lib/domainMatcher";
-import { getDataQualityNotices } from "@/lib/marketRadar";
+import { getDataQualityNotices, getOpportunityPriority, getOpportunityPriorityReasons } from "@/lib/marketRadar";
 
 interface JobDetailModalProps {
   job: Job | null;
@@ -40,6 +40,15 @@ export function JobDetailModal({
 
   const qualityNotices = getDataQualityNotices(job);
   const fit = job.careerFit || job.match?.relevanceBucket || "POSSIBLE";
+  const priority = getOpportunityPriority(job);
+  const priorityReasons = getOpportunityPriorityReasons(fit, job.freshness);
+
+  const priorityBadge = {
+    PRIORITY: "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-black ring-1 ring-emerald-500/40",
+    ACTIVE: "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 font-bold",
+    WATCH: "bg-amber-500/20 text-amber-300 border-amber-500/50 font-semibold",
+    LOW: "bg-slate-800 text-slate-400 border-slate-700",
+  }[priority];
 
   const fitBadge = {
     HIGH_RELEVANCE: {
@@ -97,11 +106,14 @@ export function JobDetailModal({
         <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-slate-800 bg-slate-950/70">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-[11px] border ${priorityBadge}`}>
+                🎯 OPPORTUNITY: {priority}
+              </span>
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] border ${fitBadge.style}`}>
                 {fitBadge.label}
               </span>
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] border ${freshnessBadge}`}>
-                🕒 {job.freshness}
+                🕒 FRESHNESS: {job.freshness}
                 {job.postedDaysAgo !== undefined && ` (${job.postedDaysAgo === 0 ? "today" : `${job.postedDaysAgo}d ago`})`}
               </span>
               <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
@@ -157,6 +169,23 @@ export function JobDetailModal({
               </div>
             </div>
           )}
+
+          {/* Opportunity Action Banner */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-white uppercase text-[11px] flex items-center gap-1.5">
+                <span>🎯 Action Status:</span>
+              </span>
+              <span className="rounded bg-cyan-950/80 border border-cyan-800/80 px-2 py-0.5 text-xs font-bold text-cyan-300 font-mono">
+                {priority}
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-300 font-medium">{priorityReasons.join(" • ")}</span>
+            </div>
+            <span className="text-[11px] text-slate-500 hidden sm:inline">
+              Priority = High/Relevant fit + Fresh/Recent posting
+            </span>
+          </div>
 
           {/* Quick Specifications Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

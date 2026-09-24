@@ -27,7 +27,103 @@ export function MarketRadarSummary({
         </span>
       </div>
 
-      {/* Grid displaying all 15 metrics in 3 distinct rows/groups */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-white uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <span>🎯 OPPORTUNITY ACTION STATUS</span>
+            </span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400 text-[11px]">
+              <span className="font-medium text-emerald-300">Priority opportunities</span> = High/Relevant career fit + Fresh/Recent posting
+            </span>
+          </div>
+          {filters.opportunityPriority && filters.opportunityPriority !== "ALL" && (
+            <button
+              onClick={() => onFilterChange({ opportunityPriority: "ALL" })}
+              className="text-[11px] text-cyan-400 hover:underline"
+            >
+              Clear Priority Filter
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+          <button
+            onClick={() =>
+              onFilterChange({
+                opportunityPriority:
+                  filters.opportunityPriority === "PRIORITY" ? "ALL" : "PRIORITY",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.opportunityPriority === "PRIORITY"
+                ? "border-emerald-500 bg-emerald-950/40 shadow-sm"
+                : "border-emerald-900/40 bg-emerald-950/20 hover:border-emerald-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-emerald-300">Priority Opportunities</div>
+            <div className="mt-1 text-lg font-black text-emerald-400">{metrics.priorityOpportunities}</div>
+            <div className="text-[9px] text-emerald-500">Apply & Act Now</div>
+          </button>
+
+          <button
+            onClick={() =>
+              onFilterChange({
+                opportunityPriority:
+                  filters.opportunityPriority === "ACTIVE" ? "ALL" : "ACTIVE",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.opportunityPriority === "ACTIVE"
+                ? "border-cyan-500 bg-cyan-950/40 shadow-sm"
+                : "border-slate-800 bg-slate-950/80 hover:border-slate-700"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-cyan-300">Active Opportunities</div>
+            <div className="mt-1 text-lg font-black text-cyan-300">{metrics.activeOpportunities}</div>
+            <div className="text-[9px] text-slate-500">Strong Fit • Older</div>
+          </button>
+
+          <button
+            onClick={() =>
+              onFilterChange({
+                opportunityPriority:
+                  filters.opportunityPriority === "WATCH" ? "ALL" : "WATCH",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.opportunityPriority === "WATCH"
+                ? "border-amber-500 bg-amber-950/40 shadow-sm"
+                : "border-slate-800 bg-slate-950/80 hover:border-slate-700"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-amber-300">Watch Opportunities</div>
+            <div className="mt-1 text-lg font-black text-amber-300">{metrics.watchOpportunities}</div>
+            <div className="text-[9px] text-slate-500">Possible Fit • Fresh</div>
+          </button>
+
+          <button
+            onClick={() =>
+              onFilterChange({
+                opportunityPriority:
+                  filters.opportunityPriority === "LOW" ? "ALL" : "LOW",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.opportunityPriority === "LOW"
+                ? "border-slate-500 bg-slate-800 shadow-sm"
+                : "border-slate-800 bg-slate-950/60 hover:border-slate-700"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-slate-400">Low Opportunities</div>
+            <div className="mt-1 text-lg font-black text-slate-400">{metrics.lowOpportunities}</div>
+            <div className="text-[9px] text-slate-500">Adjacent • Older</div>
+          </button>
+        </div>
+      </div>
+
+      {/* Grid displaying career fit, mobility, and travel metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
         {/* Row 1: Career Fit Metrics */}
         <button
