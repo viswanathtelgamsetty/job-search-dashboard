@@ -41,6 +41,7 @@ export function JobFilters({
     filters.relevance !== "ALL" ||
     filters.company !== "ALL" ||
     filters.experienceLevel !== "ALL" ||
+    (filters.freshness && filters.freshness !== "ALL") ||
     filters.postedWithinDays !== null;
 
   return (
@@ -77,11 +78,12 @@ export function JobFilters({
             aria-label="Sort jobs by"
             className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs text-slate-200 outline-none focus:border-cyan-500 font-medium"
           >
-            <option value="relevance">🎯 Relevance (High First)</option>
-            <option value="newest">🕒 Newest Posted / Discovered</option>
-            <option value="travel">✈️ International Travel First</option>
+            <option value="relevance">🎯 Career Fit (High First)</option>
+            <option value="freshest">🟢 Freshest (Newest Jobs First)</option>
+            <option value="newest">🕒 Most Recent (Posted/Discovered)</option>
+            <option value="travel">✈️ Travel Opportunity (Intl & Client First)</option>
+            <option value="location">📍 Location (Hyderabad First)</option>
             <option value="salary">💰 Highest Salary</option>
-            <option value="location">📍 Location</option>
           </select>
         </div>
       </div>
@@ -329,7 +331,7 @@ export function JobFilters({
       </div>
 
       {/* Secondary Filter Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1 border-t border-slate-800/60">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 pt-1 border-t border-slate-800/60">
         {/* Client-Facing / Consulting */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
@@ -422,10 +424,28 @@ export function JobFilters({
           </select>
         </div>
 
+        {/* Freshness Classification */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+            Freshness Radar
+          </label>
+          <select
+            value={filters.freshness || "ALL"}
+            onChange={(e) => update({ freshness: e.target.value })}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500 font-medium"
+          >
+            <option value="ALL">All Freshness</option>
+            <option value="FRESH">🟢 FRESH (≤ 3d)</option>
+            <option value="RECENT">🟡 RECENT (≤ 14d)</option>
+            <option value="OLDER">⏳ OLDER (&gt; 14d)</option>
+            <option value="UNKNOWN">⚪ UNKNOWN</option>
+          </select>
+        </div>
+
         {/* Posted Recency */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-            Freshness / Posted Date
+            Posted Date
           </label>
           <select
             value={filters.postedWithinDays === null ? "ALL" : String(filters.postedWithinDays)}
@@ -439,9 +459,9 @@ export function JobFilters({
           >
             <option value="ALL">Anytime</option>
             <option value="1">Last 24 Hours</option>
-            <option value="3">Last 3 Days (Fresh)</option>
+            <option value="3">Last 3 Days</option>
             <option value="7">Last 7 Days</option>
-            <option value="14">Last 14 Days (Recent)</option>
+            <option value="14">Last 14 Days</option>
             <option value="30">Last 30 Days</option>
           </select>
         </div>

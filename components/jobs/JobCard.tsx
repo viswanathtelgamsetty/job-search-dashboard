@@ -5,9 +5,11 @@ import { useState } from "react";
 import { formatRoleFamily } from "@/lib/roleClassifier";
 import { formatSeniorityLevel } from "@/lib/seniorityDetector";
 import { formatDomainName } from "@/lib/domainMatcher";
+import { getDataQualityNotices } from "@/lib/marketRadar";
 
 interface JobCardProps {
   job: Job;
+  onSelect?: (job: Job) => void;
   onSave?: (job: Job) => void;
   onApply?: (job: Job) => void;
   onIgnore?: (job: Job) => void;
@@ -16,6 +18,7 @@ interface JobCardProps {
 
 export function JobCard({
   job,
+  onSelect,
   onSave,
   onApply,
   onIgnore,
@@ -24,7 +27,7 @@ export function JobCard({
   const [showAllReasons, setShowAllReasons] = useState(false);
 
   // Relevance styling
-  const bucket = job.match?.careerFit || job.match?.relevanceBucket || "POSSIBLE";
+  const bucket = job.careerFit || job.match?.relevanceBucket || "POSSIBLE";
   const relevanceConfig = {
     HIGH_RELEVANCE: {
       label: "🌟 CAREER FIT: HIGH RELEVANCE",
@@ -56,17 +59,42 @@ export function JobCard({
     salaryDisplay = `${job.originalSalary || `$${Math.round((job.salaryMin || 0) / 1000)}k`} (Est: ~₹${job.salaryLpaMin}L PA)`;
   }
 
-  // Freshness presentation
-  const freshnessLabel =
+  // Freshness badge config
+  const freshnessStatus = job.freshness || "UNKNOWN";
+  const freshnessConfig = {
+    FRESH: {
+      badge: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold",
+      dot: "bg-emerald-400",
+      text: "FRESH",
+    },
+    RECENT: {
+      badge: "bg-amber-500/20 text-amber-300 border-amber-500/40 font-semibold",
+      dot: "bg-amber-400",
+      text: "RECENT",
+    },
+    OLDER: {
+      badge: "bg-slate-800/80 text-slate-400 border-slate-700",
+      dot: "bg-slate-500",
+      text: "OLDER",
+    },
+    UNKNOWN: {
+      badge: "bg-slate-800/60 text-slate-500 border-slate-700/60",
+      dot: "bg-slate-600",
+      text: "UNKNOWN",
+    },
+  }[freshnessStatus];
+
+  const freshnessAgeLabel =
     job.postedDaysAgo !== undefined
       ? job.postedDaysAgo === 0
-        ? "Posted today"
-        : job.postedDaysAgo === 1
-        ? "Posted 1d ago"
-        : `Posted ${job.postedDaysAgo}d ago`
+        ? "Today"
+        : `${job.postedDaysAgo}d ago`
       : job.postedAt
-      ? `Posted on ${new Date(job.postedAt).toLocaleDateString()}`
-      : "Discovered recently";
+      ? new Date(job.postedAt).toLocaleDateString()
+      : "Undated";
+
+  // Data quality notices
+  const qualityNotices = getDataQualityNotices(job);
 
   return (
     <article
@@ -82,7 +110,7 @@ export function JobCard({
           : "border-slate-800 bg-slate-900/70 hover:border-slate-700"
       }`}
     >
-      {/* Top Banners: Demo Data & Data Quality Warnings */}
+      {/* Top Banner Row: Demo Data & Data Quality Warnings */}
       <div className="flex flex-wrap items-center gap-2 mb-3.5">
         {job.isDemo && (
           <div className="inline-flex items-center gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300">
@@ -93,10 +121,17 @@ export function JobCard({
           </div>
         )}
 
-        {job.dataQualityWarnings && job.dataQualityWarnings.length > 0 && (
-          <div className="inline-flex items-center gap-1.5 rounded-md bg-rose-500/15 border border-rose-500/30 px-2.5 py-1 text-[11px] font-medium text-rose-300">
-            <span>⚠️ Quality Notice:</span>
-            <span>{job.dataQualityWarnings.join("; ")}</span>
+        {/* Data Quality Warning Badges */}
+        {qualityNotices.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {qualityNotices.map((notice, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1 rounded bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 text-[10px] font-medium text-amber-300"
+              >
+                <span>⚠️ {notice}</span>
+              </span>
+            ))}
           </div>
         )}
       </div>
@@ -104,20 +139,32 @@ export function JobCard({
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
         {/* Main Content */}
         <div className="flex-1 space-y-3.5">
-          {/* Header Row: Title, Relevance Badge, Live Status */}
+          {/* Header Row: Title, Relevance Badge, Live Status, Freshness */}
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="text-lg font-bold text-white tracking-tight hover:text-cyan-400 transition-colors">
-                <a href={job.url} target="_blank" rel="noopener noreferrer">
+                <button
+                  onClick={() => onSelect?.(job)}
+                  className="text-left hover:text-cyan-400 font-bold"
+                >
                   {job.title}
-                </a>
+                </button>
               </h3>
 
-              {/* Deterministic Relevance Badge */}
+              {/* Deterministic Career Fit Badge */}
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs border ${relevanceConfig.style}`}
               >
                 {relevanceConfig.label}
+              </span>
+
+              {/* Freshness Badge (Prominent) */}
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] border ${freshnessConfig.badge}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${freshnessConfig.dot}`} />
+                <span>{freshnessConfig.text}</span>
+                <span className="opacity-80 text-[10px]">({freshnessAgeLabel})</span>
               </span>
 
               {/* Live or Demo Badge */}
@@ -154,14 +201,14 @@ export function JobCard({
               </span>
             </div>
 
-            {/* Career Domains Badges */}
+            {/* Primary Domains Badges */}
             {job.domains && job.domains.length > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400 mr-0.5">Domains:</span>
+                <span className="text-[11px] font-semibold text-slate-400 mr-0.5">Primary Domains:</span>
                 {job.domains.map((d) => (
                   <span
                     key={d}
-                    className="rounded-md bg-indigo-950/40 border border-indigo-800/40 px-2 py-0.5 text-[11px] font-medium text-indigo-200"
+                    className="rounded-md bg-indigo-950/60 border border-indigo-700/60 px-2 py-0.5 text-[11px] font-medium text-indigo-200"
                   >
                     🏷️ {formatDomainName(d)}
                   </span>
@@ -220,33 +267,30 @@ export function JobCard({
               ⏳ {job.experienceMin ? `${job.experienceMin}+ yrs exp` : "12+ yrs level"}
             </span>
 
-            {/* Travel Requirement Badge */}
+            {/* Travel Requirement Badge (High Visibility) */}
             <span
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium border ${
                 job.travel.type === "INTERNATIONAL_TRAVEL"
-                  ? "bg-indigo-950/90 text-indigo-300 border-indigo-700/80 font-bold"
+                  ? "bg-indigo-950/90 text-indigo-200 border-indigo-700/80 font-bold shadow-sm"
                   : job.travel.type === "CLIENT_SITE_TRAVEL"
-                  ? "bg-cyan-950/80 text-cyan-300 border-cyan-700/80 font-bold"
+                  ? "bg-cyan-950/80 text-cyan-200 border-cyan-700/80 font-bold shadow-sm"
                   : job.travel.type === "INTERNATIONAL_TEAM_ONLY"
                   ? "bg-sky-950/70 text-sky-300 border-sky-800/60"
                   : job.travel.type === "RELOCATION"
-                  ? "bg-rose-950/70 text-rose-300 border-rose-800/60"
+                  ? "bg-rose-950/70 text-rose-300 border-rose-800/60 font-semibold"
+                  : job.travel.type === "REMOTE_GLOBAL"
+                  ? "bg-emerald-950/70 text-emerald-300 border-emerald-800/60"
                   : "bg-slate-900 text-slate-400 border-slate-800"
               }`}
             >
               {job.travel.type === "INTERNATIONAL_TRAVEL" && "✈️ International Travel"}
               {job.travel.type === "CLIENT_SITE_TRAVEL" && "🏢 Client-Site Travel"}
               {job.travel.type === "INTERNATIONAL_TEAM_ONLY" && "🌐 International Team Only"}
-              {job.travel.type === "RELOCATION" && "🌍 Relocation Required"}
-              {job.travel.type === "REMOTE_GLOBAL" && "🌐 Global Remote"}
-              {job.travel.type === "NO_TRAVEL_MENTIONED" && "No Travel Mentioned"}
-              {job.travel.type === "UNKNOWN" && "Travel Unknown"}
+              {job.travel.type === "RELOCATION" && "📦 Relocation Required"}
+              {job.travel.type === "REMOTE_GLOBAL" && "🌍 Remote Global"}
+              {job.travel.type === "NO_TRAVEL_MENTIONED" && "📄 No Travel Mentioned"}
+              {job.travel.type === "UNKNOWN" && "❓ Travel Unknown"}
               {job.travel.percentage ? ` (${job.travel.percentage}%)` : ""}
-            </span>
-
-            {/* Freshness */}
-            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-800/50 border border-slate-700/50 px-2.5 py-1 text-[11px] text-slate-400">
-              🕒 {freshnessLabel}
             </span>
           </div>
 
@@ -258,8 +302,9 @@ export function JobCard({
             </div>
           )}
 
-          {/* Extracted Actual Job Technologies */}
+          {/* Extracted Actual Job Technologies with target fit indicator */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[11px] font-semibold text-slate-400 mr-0.5">Matched Tech:</span>
             {job.skills.map((skill) => {
               const isMatched = job.matchedTargetTechnologies?.includes(skill);
               return (
@@ -268,7 +313,7 @@ export function JobCard({
                   className={`rounded-md border px-2.5 py-1 text-xs ${
                     isMatched
                       ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-300 font-medium"
-                      : "border-slate-800 bg-slate-950/80 text-slate-300"
+                      : "border-slate-800 bg-slate-950/80 text-slate-400"
                   }`}
                 >
                   {isMatched ? `✓ ${skill}` : skill}
@@ -348,10 +393,18 @@ export function JobCard({
 
         {/* Actions Button Panel */}
         <div className="flex flex-row lg:flex-col items-center lg:items-stretch gap-2 lg:w-44 pt-2 lg:pt-0 shrink-0">
+          {/* Inspect Radar Details Button */}
+          <button
+            onClick={() => onSelect?.(job)}
+            className="w-full rounded-xl border border-cyan-500/50 bg-cyan-950/40 px-3.5 py-2 text-xs font-semibold text-cyan-300 hover:bg-cyan-900/50 hover:text-white transition"
+          >
+            🔍 Details & Evidence
+          </button>
+
           {/* Save Action */}
           <button
             onClick={() => onSave?.(job)}
-            className={`w-full rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
+            className={`w-full rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
               job.status === "SAVED"
                 ? "border-cyan-500 bg-cyan-500/10 text-cyan-300"
                 : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
@@ -366,7 +419,7 @@ export function JobCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => onApply?.(job)}
-            className="w-full text-center rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:from-cyan-400 hover:to-indigo-500 transition"
+            className="w-full text-center rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:from-cyan-400 hover:to-indigo-500 transition"
           >
             🚀 Apply / Open
           </a>

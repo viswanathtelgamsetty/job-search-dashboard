@@ -359,6 +359,33 @@ export interface MarketScanMetrics {
   };
 }
 
+export type MarketRadarSection =
+  | "ALL"
+  | "BEST_MATCHES"
+  | "FRESH"
+  | "TRAVEL"
+  | "REMOTE_GLOBAL"
+  | "HYDERABAD_INDIA"
+  | "ADJACENT";
+
+export interface MarketRadarMetrics {
+  totalJobs: number;
+  highRelevance: number;
+  relevant: number;
+  possible: number;
+  lowRelevance: number;
+  india: number;
+  hyderabad: number;
+  remoteIndia: number;
+  globalRemote: number;
+  internationalOnsite: number;
+  internationalTravel: number;
+  clientSiteTravel: number;
+  relocation: number;
+  freshJobs: number;
+  recentJobs: number;
+}
+
 export interface JobFiltersState {
   search: string;
   location: string;
@@ -376,5 +403,6 @@ export interface JobFiltersState {
   salaryState?: string;
   freshness?: string;
   postedWithinDays: number | null;
-  sortBy: "newest" | "relevance" | "salary" | "travel" | "location";
+  sortBy: "relevance" | "freshest" | "newest" | "travel" | "location" | "salary";
+  section?: MarketRadarSection;
 }
