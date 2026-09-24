@@ -426,37 +426,79 @@ export function evaluateJobMatch(
   const hasStrongPrimaryDomain = domainFit.strength === "STRONG";
   const isTargetRole = roleFit.strength === "STRONG";
 
+  // Low Priority / Excluded roles check (Section 10 & 11)
+  const isLowPriorityOrExcluded =
+    /\b(qa\b|quality\s+assurance|tester|testing|sdet|test\s+automation|data\s+scientist|data\s+analyst|machine\s+learning|ai\s+researcher|hr\b|human\s+resources|recruiter|recruitment|talent\s+acquisition|product\s+manager|project\s+manager|scrum\s+master|sales\s+only|account\s+executive|business\s+development|administrative|office\s+assistant|admin\s+assistant|customer\s+support|helpdesk|intern\b|graduate\b|trainee\b|apprentice\b|junior\b|entry\s+level)\b/i.test(
+      job.title
+    );
+
+  // Section 14: Solutions Architect requires verified technical / architectural dimensions
+  const hasSolutionsArchitectEvidence =
+    matchedPrimaryDomains.some((d) =>
+      [
+        "FRONTEND",
+        "DIGITAL_EXPERIENCE",
+        "CMS",
+        "COMMERCE",
+        "ENTERPRISE_INTEGRATION",
+        "TECHNICAL_ARCHITECTURE",
+        "CLIENT_CONSULTING",
+        "PROFESSIONAL_SERVICES",
+      ].includes(d)
+    ) ||
+    hasTargetTech ||
+    /\b(frontend|digital\s+experience|cms|commerce|integration|apis?|rest\s+apis|customer\s+architecture|cloud|consulting|implementation|microservices)\b/i.test(
+      job.description || ""
+    );
+
+  // Section 14: Senior Software Engineer requires frontend evidence
+  const hasFrontendEvidence =
+    matchedDomainKeys.includes("FRONTEND") ||
+    matchedTechNames.some((t) =>
+      ["React", "Next.js", "Angular", "TypeScript", "JavaScript", "Design Systems"].includes(t)
+    ) ||
+    /\b(react|angular|next\.?js|frontend|front[- ]end|ui\b|web\s+application|design\s+systems?|typescript|javascript)\b/i.test(
+      `${job.title} ${job.description || ""}`
+    );
+
+  const isGenericSoftwareEngineer =
+    /\b(software\s+engineer|software\s+developer|full[- ]?stack)\b/i.test(job.title) &&
+    !/\b(frontend|front[- ]end|ui)\b/i.test(job.title);
+
   let relevanceBucket: RelevanceBucket;
 
-  // HIGH_RELEVANCE:
-  // Requires:
-  // 1. India / remote compatibility
-  // 2. Appropriate seniority (Architect/Lead or Senior in target domain)
-  // 3. Not purely an adjacent domain without target tech
-  // 4. Strong role/domain alignment + verified target technology/domain evidence
-  if (
+  if (isLowPriorityOrExcluded) {
+    relevanceBucket = "LOW_RELEVANCE";
+  } else if (
     isIndiaFriendly &&
     hasSeniority &&
+    seniorityResult.level !== "ENTRY" &&
     !isAdjacentDomainOnly &&
     (
       // Case A: Technical / Frontend / CMS Architect with verified target tech in India
-      (isArchitectureOrLeadRole && hasTargetTech) ||
+      (isArchitectureOrLeadRole &&
+        hasTargetTech &&
+        (roleClassification.primary !== "SOLUTIONS_ARCHITECT" || hasSolutionsArchitectEvidence)) ||
       // Case B: Deep domain specialist (e.g. Senior Shopify Developer with Next.js, Contentful, Commerce)
       (hasStrongPrimaryDomain && hasStrongTech) ||
-      // Case C: Solutions Architect with Node/tech + client-facing + travel boost in India
+      // Case C: Solutions Architect with verified evidence + tech + client-facing in India
       (roleClassification.primary === "SOLUTIONS_ARCHITECT" &&
+        hasSolutionsArchitectEvidence &&
         clientFacingFit.strength === "STRONG" &&
-        hasTargetTech &&
-        travelFit.strength === "STRONG")
+        hasTargetTech) ||
+      // Case D: Senior Frontend Engineer with verified frontend evidence & target tech
+      (roleClassification.primary === "SENIOR_FRONTEND_ENGINEER" &&
+        hasFrontendEvidence &&
+        hasTargetTech)
     )
   ) {
     relevanceBucket = "HIGH_RELEVANCE";
   } else if (
     isIndiaFriendly &&
     hasSeniority &&
+    seniorityResult.level !== "ENTRY" &&
     (
-      // Case 1: Architecture or Lead role in India, even if stack is adjacent (e.g. Solutions Architect with AWS/Java, SRE Architect in Hyderabad)
-      isTargetRole ||
+      (isTargetRole && (!isGenericSoftwareEngineer || hasFrontendEvidence)) ||
       hasPrimaryDomain ||
       clientFacingFit.strength === "STRONG" ||
       hasTargetTech
@@ -466,7 +508,7 @@ export function evaluateJobMatch(
   } else if (
     hasTargetTech ||
     hasPrimaryDomain ||
-    (hasSeniority && isIndiaFriendly) ||
+    (hasSeniority && isIndiaFriendly && seniorityResult.level !== "ENTRY") ||
     isTargetRole
   ) {
     relevanceBucket = "POSSIBLE";

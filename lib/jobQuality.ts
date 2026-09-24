@@ -90,5 +90,43 @@ export function detectDataQualityWarnings(job: Partial<Job>): string[] {
     warnings.push("Unknown job provider source");
   }
 
+  // 7. Missing Description (Section 20)
+  if (!job.description || job.description.trim().length < 50) {
+    warnings.push("Missing or sparse job description");
+  }
+
+  // 8. Missing / Unknown Seniority
+  if (!job.seniority || job.seniority === "UNKNOWN") {
+    warnings.push("Seniority level not specified");
+  }
+
+  // 9. Unknown Work Authorization
+  if (!job.workAuthorization || job.workAuthorization.authorization === "UNKNOWN") {
+    warnings.push("Work authorization eligibility unspecified");
+  }
+
+  // 10. Unknown Travel
+  if (!job.travel || job.travel.type === "UNKNOWN" || job.travel.type === "TRAVEL_UNKNOWN") {
+    warnings.push("Travel requirements unspecified");
+  }
+
+  // 11. Unknown Market Region
+  if (!job.market || job.market === "UNKNOWN") {
+    warnings.push("Market region unclassified");
+  }
+
+  // 12. Insufficient Evidence
+  if (
+    !job.match?.domainMatches ||
+    job.match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER").length === 0
+  ) {
+    warnings.push("Insufficient domain evidence in posting");
+  }
+
+  // 13. Stale Posting
+  if (job.postedDaysAgo !== undefined && job.postedDaysAgo > 30) {
+    warnings.push(`Stale posting (${job.postedDaysAgo} days old)`);
+  }
+
   return warnings;
 }

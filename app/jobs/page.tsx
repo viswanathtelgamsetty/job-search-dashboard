@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { Application, CareerDomain, Job, JobFiltersState, JobStatus, MarketRadarSection, ProviderStatus } from "@/types";
+import type { Application, CareerDomain, Job, JobFiltersState, JobStatus, MarketRadarSection, OpportunityType, ProviderStatus } from "@/types";
 import { getStoredJobs, saveJobs, updateJobStatusInStorage } from "@/lib/storage";
 import {
   applyToJobAsApplication,
@@ -17,6 +17,7 @@ import { MarketRadarSummary } from "@/components/jobs/MarketRadarSummary";
 import { OpportunityPriorityBar } from "@/components/jobs/OpportunityPriorityBar";
 import { CareerLanesBar } from "@/components/jobs/CareerLanesBar";
 import { MarketRadarSectionTabs } from "@/components/jobs/MarketRadarSectionTabs";
+import { TopInternationalOpportunities } from "@/components/jobs/TopInternationalOpportunities";
 import { SyncButton } from "@/components/jobs/SyncButton";
 import {
   calculateMarketRadarMetrics,
@@ -45,6 +46,12 @@ const initialFilters: JobFiltersState = {
   section: "ALL",
   opportunityPriority: "ALL",
   applicationTrackingFilter: "ALL",
+  market: "ALL",
+  emeaCountry: "ALL",
+  opportunityType: "ALL",
+  internationalExposure: "ALL",
+  workAuthorization: "ALL",
+  internationalBucket: "ALL",
 };
 
 export default function MarketRadarPage() {
@@ -302,6 +309,67 @@ export default function MarketRadarPage() {
         if (postedMs < cutoffMs) return false;
       }
 
+      // Phase 7 Market Filter
+      if (filters.market && filters.market !== "ALL") {
+        if (job.market !== filters.market) return false;
+      }
+
+      // Phase 7 EMEA Country Filter
+      if (filters.emeaCountry && filters.emeaCountry !== "ALL") {
+        if (job.emeaCountry !== filters.emeaCountry) return false;
+      }
+
+      // Phase 7 Opportunity Type Filter
+      if (filters.opportunityType && filters.opportunityType !== "ALL") {
+        if (filters.opportunityType === "INDIA_TO_EMEA") {
+          if (!job.isIndiaToEmea) return false;
+        } else if (filters.opportunityType === "CLIENT_FACING") {
+          if (job.clientFacing !== "YES") return false;
+        } else if (filters.opportunityType === "INTERNATIONAL_TRAVEL") {
+          const hasIntlTravel =
+            job.travel?.type === "INTERNATIONAL_TRAVEL" ||
+            job.internationalExposure?.exposure === "INTERNATIONAL_TRAVEL";
+          if (!hasIntlTravel) return false;
+        } else if (filters.opportunityType === "RELOCATION") {
+          const isReloc =
+            job.travel?.type === "RELOCATION" ||
+            job.internationalExposure?.exposure === "RELOCATION" ||
+            job.opportunityType === "RELOCATION";
+          if (!isReloc) return false;
+        } else if (filters.opportunityType === "GLOBAL_REMOTE") {
+          const isGlobRem =
+            job.market === "GLOBAL_REMOTE" ||
+            job.opportunityType === "GLOBAL_REMOTE" ||
+            job.travel?.type === "REMOTE_GLOBAL";
+          if (!isGlobRem) return false;
+        } else {
+          const matchesPrimary = job.opportunityType === filters.opportunityType;
+          const matchesMulti = job.opportunityTypes?.includes(filters.opportunityType as OpportunityType);
+          if (!matchesPrimary && !matchesMulti) return false;
+        }
+      }
+
+      // Phase 7 International Exposure Filter
+      if (filters.internationalExposure && filters.internationalExposure !== "ALL") {
+        if (job.internationalExposure?.exposure !== filters.internationalExposure) {
+          return false;
+        }
+      }
+
+      // Phase 7 Work Authorization Filter
+      if (filters.workAuthorization && filters.workAuthorization !== "ALL") {
+        if (job.workAuthorization?.authorization !== filters.workAuthorization) {
+          return false;
+        }
+      }
+
+      // Phase 7 International Opportunity Bucket Filter
+      if (filters.internationalBucket && filters.internationalBucket !== "ALL") {
+        if (job.internationalOpportunity?.bucket !== filters.internationalBucket) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -504,6 +572,12 @@ export default function MarketRadarPage() {
         availableCompanies={availableCompanies}
         totalCount={jobs.length}
         filteredCount={filteredJobs.length}
+      />
+
+      {/* TOP INTERNATIONAL OPPORTUNITIES SPOTLIGHT (Section 17) */}
+      <TopInternationalOpportunities
+        jobs={jobs}
+        onSelectJob={(j) => setSelectedJob(j)}
       />
 
       {/* JOBS STREAM */}

@@ -8,7 +8,7 @@ export function extractTravelDetails(
     notes?: string;
   }
 ): TravelDetails {
-  const combined = `${text || ""} ${hints?.notes || ""}`.trim();
+  const combined = (text || "").trim();
 
   if (!combined) {
     return {
@@ -16,6 +16,18 @@ export function extractTravelDetails(
       destinations: [],
       evidence: "No travel mentioned",
       notes: "No travel mentioned",
+    };
+  }
+
+  // Guard: Explicit negative travel statements
+  if (/\b(?:no\s+travel(?:\s+is)?\s+required|0%\s+travel|travel\s+(?:is\s+)?not\s+required|no\s+business\s+travel)\b/i.test(combined)) {
+    return {
+      type: "NO_TRAVEL_MENTIONED",
+      percentage: 0,
+      percentageRange: "<10%",
+      destinations: [],
+      evidence: "No travel required",
+      notes: "Posting explicitly states no travel required",
     };
   }
 
@@ -71,6 +83,8 @@ export function extractTravelDetails(
     /(?:international\s+travel|travel\s+internationally|overseas\s+travel|business\s+trips?\s+abroad)/i,
     // "periodic client travel", "customer-site travel", "client-site travel"
     /(?:periodic\s+client\s+travel|customer-site\s+travel|client-site\s+travel|travel\s+to\s+client\s+sites?|travel\s+to\s+customer\s+locations?)/i,
+    // "occasional travel", "frequent travel"
+    /(?:occasional\s+travel|travel\s+occasionally|frequent\s+travel|travel\s+frequently|periodic\s+travel)/i,
     // "X% travel"
     /(?:\d{1,2}\s*%\s*travel|travel\s*(?:up\s+to\s+)?\d{1,2}\s*%)/i,
     // "willing to travel up to X%", "ability to travel up to X%"
@@ -86,25 +100,42 @@ export function extractTravelDetails(
     }
   }
 
-  // 4. If actual travel evidence is found:
+  // Determine travel category based on percentage or explicit frequency
+  let travelCategory: TravelType | undefined;
+  if (rangeMatch) {
+    const low = parseInt(rangeMatch[1], 10);
+    const high = parseInt(rangeMatch[2], 10);
+    if (high > 30) travelCategory = "TRAVEL_30_PLUS";
+    else if (high > 20 || (low >= 20 && high <= 30)) travelCategory = "TRAVEL_20_30";
+    else if (high >= 10) travelCategory = "TRAVEL_10_20";
+    else travelCategory = "OCCASIONAL_TRAVEL";
+  } else if (percentage !== undefined) {
+    if (percentage > 30) travelCategory = "TRAVEL_30_PLUS";
+    else if (percentage > 20) travelCategory = "TRAVEL_20_30";
+    else if (percentage >= 10) travelCategory = "TRAVEL_10_20";
+    else travelCategory = "OCCASIONAL_TRAVEL";
+  } else if (/\b(occasional\s+travel|travel\s+occasionally)\b/i.test(combined)) {
+    travelCategory = "OCCASIONAL_TRAVEL";
+  }
+
   if (travelEvidenceSnippet) {
     const destinations = extractDestinations(combined);
-    const isInternational =
-      /(?:international|overseas|abroad|us|usa|united states|america|europe|singapore|middle east|dubai|uk|london|germany|switzerland)/i.test(
-        travelEvidenceSnippet
-      ) || destinations.length > 0;
+    const hasExplicitIntlDestinations = destinations.length > 0;
+    const hasIntlKeyword = /\b(international(?:ly)?|overseas|abroad)\b/i.test(travelEvidenceSnippet);
 
     const isClientSite =
-      /(?:customer|client|on-site|onsite)/i.test(travelEvidenceSnippet) && !isInternational;
+      (/\b(customer|client|on-site|onsite)\b/i.test(travelEvidenceSnippet) ||
+      /\b(customer|client)\s+(?:sites?|locations?)\b/i.test(combined)) &&
+      !hasExplicitIntlDestinations &&
+      !hasIntlKeyword;
 
-    const type: TravelType = isInternational
-      ? "INTERNATIONAL_TRAVEL"
-      : isClientSite
+    const type: TravelType = isClientSite
       ? "CLIENT_SITE_TRAVEL"
-      : "INTERNATIONAL_TRAVEL"; // travel with unknown destination defaults to international/client
+      : "INTERNATIONAL_TRAVEL"; // Defaults to international travel when travel is required without purely local client site restriction
 
     return {
       type,
+      travelCategory,
       percentage,
       percentageRange,
       destinations,

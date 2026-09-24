@@ -575,6 +575,10 @@ export function calculateMarketActivity(jobs: Job[]): MarketActivityMetrics {
   let globalRemote = 0;
   let internationalTravel = 0;
   let clientSiteTravel = 0;
+  let emea = 0;
+  let indiaToEmea = 0;
+  let clientFacing = 0;
+  let internationalPriority = 0;
 
   for (const j of jobs) {
     const fit = j.careerFit || j.match?.relevanceBucket;
@@ -586,7 +590,7 @@ export function calculateMarketActivity(jobs: Job[]): MarketActivityMetrics {
     else if (j.freshness === "RECENT") recent++;
 
     if (j.normalizedLocation === "HYDERABAD") hyderabad++;
-    if (j.isIndiaEligible) india++;
+    if (j.isIndiaEligible || j.market === "INDIA") india++;
 
     if (j.normalizedLocation === "REMOTE_INDIA" || (j.remoteType === "REMOTE" && j.isIndiaEligible)) {
       remoteIndia++;
@@ -595,6 +599,7 @@ export function calculateMarketActivity(jobs: Job[]): MarketActivityMetrics {
     if (
       j.travel?.type === "REMOTE_GLOBAL" ||
       j.normalizedLocation === "REMOTE_GLOBAL" ||
+      j.market === "GLOBAL_REMOTE" ||
       (j.remoteType === "REMOTE" &&
         (j.location?.toLowerCase().includes("global") ||
           j.location?.toLowerCase().includes("worldwide")))
@@ -602,8 +607,25 @@ export function calculateMarketActivity(jobs: Job[]): MarketActivityMetrics {
       globalRemote++;
     }
 
-    if (j.travel?.type === "INTERNATIONAL_TRAVEL") internationalTravel++;
-    if (j.travel?.type === "CLIENT_SITE_TRAVEL") clientSiteTravel++;
+    if (
+      j.travel?.type === "INTERNATIONAL_TRAVEL" ||
+      j.internationalExposure?.exposure === "INTERNATIONAL_TRAVEL"
+    ) {
+      internationalTravel++;
+    }
+    if (
+      j.travel?.type === "CLIENT_SITE_TRAVEL" ||
+      j.internationalExposure?.exposure === "CLIENT_SITE_TRAVEL"
+    ) {
+      clientSiteTravel++;
+    }
+
+    if (j.market === "EMEA") emea++;
+    if (j.isIndiaToEmea) indiaToEmea++;
+    if (j.clientFacing === "YES") clientFacing++;
+    if (j.internationalOpportunity?.bucket === "INTERNATIONAL_PRIORITY") {
+      internationalPriority++;
+    }
   }
 
   return {
@@ -619,5 +641,9 @@ export function calculateMarketActivity(jobs: Job[]): MarketActivityMetrics {
     globalRemote,
     internationalTravel,
     clientSiteTravel,
+    emea,
+    indiaToEmea,
+    clientFacing,
+    internationalPriority,
   };
 }

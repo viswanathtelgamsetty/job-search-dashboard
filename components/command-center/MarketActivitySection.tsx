@@ -137,7 +137,43 @@ export function MarketActivitySection({ metrics }: MarketActivitySectionProps) {
             Client-Site Travel
           </span>
           <p className="mt-1 text-2xl font-black text-slate-200">{metrics.clientSiteTravel}</p>
-          <p className="text-[11px] text-slate-500">domestic client visits</p>
+          <p className="text-[11px] text-slate-500">domestic / overseas visits</p>
+        </div>
+
+        {/* EMEA Regional Opportunities */}
+        <div className="rounded-xl border border-purple-800/40 bg-slate-900/70 p-3.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-400">
+            EMEA Markets
+          </span>
+          <p className="mt-1 text-2xl font-black text-purple-300">{metrics.emea ?? 0}</p>
+          <p className="text-[11px] text-purple-400/80">UK, EU & Middle East</p>
+        </div>
+
+        {/* India -> EMEA Opportunities */}
+        <div className="rounded-xl border border-fuchsia-800/40 bg-slate-900/70 p-3.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400">
+            India → EMEA
+          </span>
+          <p className="mt-1 text-2xl font-black text-fuchsia-300">{metrics.indiaToEmea ?? 0}</p>
+          <p className="text-[11px] text-fuchsia-400/80">India base + EMEA clients</p>
+        </div>
+
+        {/* Client-Facing Roles */}
+        <div className="rounded-xl border border-amber-800/40 bg-slate-900/70 p-3.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+            Client-Facing
+          </span>
+          <p className="mt-1 text-2xl font-black text-amber-300">{metrics.clientFacing ?? 0}</p>
+          <p className="text-[11px] text-amber-400/80">customer consulting / PS</p>
+        </div>
+
+        {/* International Priority */}
+        <div className="rounded-xl border border-cyan-800/40 bg-slate-900/70 p-3.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+            Intl Priority
+          </span>
+          <p className="mt-1 text-2xl font-black text-cyan-300">{metrics.internationalPriority ?? 0}</p>
+          <p className="text-[11px] text-cyan-400/80">top international leads</p>
         </div>
       </div>
     </section>

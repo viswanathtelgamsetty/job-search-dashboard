@@ -6,6 +6,7 @@ import type {
   MarketRadarMetrics,
   MarketRadarSection,
   OpportunityPriority,
+  OpportunityType,
   RelevanceBucket,
 } from "@/types";
 
@@ -155,10 +156,24 @@ export const RADAR_SECTIONS: RadarSectionConfig[] = [
     subtitle: "Possible fits requiring transition or minor domain overlap",
     badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/40",
   },
+  {
+    id: "EMEA_OPPORTUNITIES",
+    tag: "G",
+    title: "EMEA Opportunities",
+    subtitle: "Verified UK, European & Middle East regional roles",
+    badgeColor: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+  },
+  {
+    id: "INDIA_TO_EMEA",
+    tag: "H",
+    title: "India → EMEA Roles",
+    subtitle: "India-based positions engaging EMEA clients & international travel",
+    badgeColor: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40",
+  },
 ];
 
 /**
- * Calculates the exact 15 summary metrics requested for the Market Radar.
+ * Calculates the summary metrics requested for the Market Radar (including Phase 7 additions).
  */
 export function calculateMarketRadarMetrics(jobs: Job[]): MarketRadarMetrics {
   const liveJobs = jobs.filter((j) => !j.isDemo);
@@ -177,24 +192,33 @@ export function calculateMarketRadarMetrics(jobs: Job[]): MarketRadarMetrics {
     (j) => (j.careerFit || j.match?.relevanceBucket) === "LOW_RELEVANCE"
   ).length;
 
-  const india = liveJobs.filter((j) => j.isIndiaEligible).length;
+  const india = liveJobs.filter((j) => j.isIndiaEligible || j.market === "INDIA").length;
   const hyderabad = liveJobs.filter((j) => j.normalizedLocation === "HYDERABAD").length;
   const remoteIndia = liveJobs.filter((j) => j.normalizedLocation === "REMOTE_INDIA").length;
   const globalRemote = liveJobs.filter(
-    (j) => j.travel?.type === "REMOTE_GLOBAL" || j.normalizedLocation === "REMOTE_GLOBAL"
+    (j) =>
+      j.travel?.type === "REMOTE_GLOBAL" ||
+      j.normalizedLocation === "REMOTE_GLOBAL" ||
+      j.market === "GLOBAL_REMOTE"
   ).length;
   const internationalOnsite = liveJobs.filter(
     (j) => !j.isIndiaEligible && (j.remoteType === "ONSITE" || j.remoteType === "HYBRID")
   ).length;
 
   const internationalTravel = liveJobs.filter(
-    (j) => j.travel?.type === "INTERNATIONAL_TRAVEL"
+    (j) =>
+      j.travel?.type === "INTERNATIONAL_TRAVEL" ||
+      j.internationalExposure?.exposure === "INTERNATIONAL_TRAVEL"
   ).length;
   const clientSiteTravel = liveJobs.filter(
-    (j) => j.travel?.type === "CLIENT_SITE_TRAVEL"
+    (j) =>
+      j.travel?.type === "CLIENT_SITE_TRAVEL" ||
+      j.internationalExposure?.exposure === "CLIENT_SITE_TRAVEL"
   ).length;
   const relocation = liveJobs.filter(
-    (j) => j.travel?.type === "RELOCATION"
+    (j) =>
+      j.travel?.type === "RELOCATION" ||
+      j.internationalExposure?.exposure === "RELOCATION"
   ).length;
 
   const freshJobs = liveJobs.filter((j) => j.freshness === "FRESH").length;
@@ -212,6 +236,29 @@ export function calculateMarketRadarMetrics(jobs: Job[]): MarketRadarMetrics {
   const lowOpportunities = liveJobs.filter(
     (j) => getOpportunityPriority(j) === "LOW"
   ).length;
+
+  // Phase 7 Global & EMEA metrics
+  const emeaOpportunities = liveJobs.filter((j) => j.market === "EMEA").length;
+  const indiaToEmeaOpportunities = liveJobs.filter((j) => j.isIndiaToEmea).length;
+  const northAmerica = liveJobs.filter((j) => j.market === "NORTH_AMERICA").length;
+  const apac = liveJobs.filter((j) => j.market === "APAC").length;
+  const clientFacingCount = liveJobs.filter((j) => j.clientFacing === "YES").length;
+  const internationalPriorityCount = liveJobs.filter(
+    (j) => j.internationalOpportunity?.bucket === "INTERNATIONAL_PRIORITY"
+  ).length;
+  const internationalActiveCount = liveJobs.filter(
+    (j) => j.internationalOpportunity?.bucket === "INTERNATIONAL_ACTIVE"
+  ).length;
+  const internationalWatchCount = liveJobs.filter(
+    (j) => j.internationalOpportunity?.bucket === "INTERNATIONAL_WATCH"
+  ).length;
+
+  const emeaCountryCounts: Record<string, number> = {};
+  for (const j of liveJobs) {
+    if (j.market === "EMEA" && j.emeaCountry) {
+      emeaCountryCounts[j.emeaCountry] = (emeaCountryCounts[j.emeaCountry] || 0) + 1;
+    }
+  }
 
   return {
     totalJobs,
@@ -233,6 +280,15 @@ export function calculateMarketRadarMetrics(jobs: Job[]): MarketRadarMetrics {
     activeOpportunities,
     watchOpportunities,
     lowOpportunities,
+    emeaOpportunities,
+    indiaToEmeaOpportunities,
+    northAmerica,
+    apac,
+    clientFacingCount,
+    internationalPriorityCount,
+    internationalActiveCount,
+    internationalWatchCount,
+    emeaCountryCounts,
   };
 }
 
@@ -276,6 +332,14 @@ export function matchesRadarSection(job: Job, section: MarketRadarSection): bool
     case "ADJACENT":
       // F. Adjacent Opportunities: Possible fits
       return fit === "POSSIBLE";
+
+    case "EMEA_OPPORTUNITIES":
+      // G. EMEA Opportunities: Verified EMEA regional roles
+      return job.market === "EMEA";
+
+    case "INDIA_TO_EMEA":
+      // H. India -> EMEA Roles: India based engaging EMEA clients / travel
+      return job.isIndiaToEmea === true;
 
     default:
       return true;
@@ -330,6 +394,62 @@ export function sortMarketRadarJobs(
   sortBy: JobFiltersState["sortBy"]
 ): Job[] {
   return [...jobs].sort((a, b) => {
+    if (sortBy === "international") {
+      // 1. Bucket: PRIORITY (4) > ACTIVE (3) > WATCH (2) > NOT_INTERNATIONAL (1)
+      const getBucketWeight = (j: Job) => {
+        const bkt = j.internationalOpportunity?.bucket;
+        if (bkt === "INTERNATIONAL_PRIORITY") return 4;
+        if (bkt === "INTERNATIONAL_ACTIVE") return 3;
+        if (bkt === "INTERNATIONAL_WATCH") return 2;
+        return 1;
+      };
+      const bktDiff = getBucketWeight(b) - getBucketWeight(a);
+      if (bktDiff !== 0) return bktDiff;
+
+      // 2. International opportunity score
+      const scoreDiff = (b.internationalOpportunity?.score || 0) - (a.internationalOpportunity?.score || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      // 3. Career fit tie-breaker
+      const getFitRank = (j: Job) => {
+        const bkt = j.careerFit || j.match?.relevanceBucket;
+        if (bkt === "HIGH_RELEVANCE") return 4;
+        if (bkt === "RELEVANT") return 3;
+        if (bkt === "POSSIBLE") return 2;
+        return 1;
+      };
+      return getFitRank(b) - getFitRank(a);
+    }
+
+    if (sortBy === "clientFacing") {
+      const aCF = a.clientFacing === "YES" ? 1 : 0;
+      const bCF = b.clientFacing === "YES" ? 1 : 0;
+      if (bCF !== aCF) return bCF - aCF;
+
+      const getFitRank = (j: Job) => {
+        const bkt = j.careerFit || j.match?.relevanceBucket;
+        if (bkt === "HIGH_RELEVANCE") return 4;
+        if (bkt === "RELEVANT") return 3;
+        if (bkt === "POSSIBLE") return 2;
+        return 1;
+      };
+      return getFitRank(b) - getFitRank(a);
+    }
+
+    if (sortBy === "market") {
+      const getMarketRank = (j: Job) => {
+        if (j.market === "INDIA") return 5;
+        if (j.market === "EMEA") return 4;
+        if (j.market === "GLOBAL_REMOTE") return 3;
+        if (j.market === "NORTH_AMERICA") return 2;
+        if (j.market === "APAC") return 1;
+        return 0;
+      };
+      const mDiff = getMarketRank(b) - getMarketRank(a);
+      if (mDiff !== 0) return mDiff;
+      return (a.market || "").localeCompare(b.market || "");
+    }
+
     if (sortBy === "relevance") {
       // 1. Opportunity Priority: PRIORITY (4) > ACTIVE (3) > WATCH (2) > LOW (1)
       const getPriorityWeight = (j: Job) => {
@@ -453,5 +573,75 @@ export function sortMarketRadarJobs(
     }
 
     return 0;
+  });
+}
+
+/**
+ * Filters jobs using Phase 7 multi-dimensional parameters.
+ */
+export function filterJobsWithPhase7(jobs: Job[], filters: JobFiltersState): Job[] {
+  return jobs.filter((job) => {
+    // 1. Market Filter
+    if (filters.market && filters.market !== "ALL") {
+      if (job.market !== filters.market) return false;
+    }
+
+    // 2. EMEA Country Filter
+    if (filters.emeaCountry && filters.emeaCountry !== "ALL") {
+      if (job.emeaCountry !== filters.emeaCountry) return false;
+    }
+
+    // 3. Opportunity Type Filter
+    if (filters.opportunityType && filters.opportunityType !== "ALL") {
+      if (filters.opportunityType === "INDIA_TO_EMEA") {
+        if (!job.isIndiaToEmea) return false;
+      } else if (filters.opportunityType === "CLIENT_FACING") {
+        if (job.clientFacing !== "YES") return false;
+      } else if (filters.opportunityType === "INTERNATIONAL_TRAVEL") {
+        const hasIntlTravel =
+          job.travel?.type === "INTERNATIONAL_TRAVEL" ||
+          job.internationalExposure?.exposure === "INTERNATIONAL_TRAVEL";
+        if (!hasIntlTravel) return false;
+      } else if (filters.opportunityType === "RELOCATION") {
+        const isReloc =
+          job.travel?.type === "RELOCATION" ||
+          job.internationalExposure?.exposure === "RELOCATION" ||
+          job.opportunityType === "RELOCATION";
+        if (!isReloc) return false;
+      } else if (filters.opportunityType === "GLOBAL_REMOTE") {
+        const isGlobRem =
+          job.market === "GLOBAL_REMOTE" ||
+          job.opportunityType === "GLOBAL_REMOTE" ||
+          job.travel?.type === "REMOTE_GLOBAL";
+        if (!isGlobRem) return false;
+      } else {
+        const matchesPrimary = job.opportunityType === filters.opportunityType;
+        const matchesMulti = job.opportunityTypes?.includes(filters.opportunityType as OpportunityType);
+        if (!matchesPrimary && !matchesMulti) return false;
+      }
+    }
+
+    // 4. International Exposure Filter
+    if (filters.internationalExposure && filters.internationalExposure !== "ALL") {
+      if (job.internationalExposure?.exposure !== filters.internationalExposure) {
+        return false;
+      }
+    }
+
+    // 5. Work Authorization Filter
+    if (filters.workAuthorization && filters.workAuthorization !== "ALL") {
+      if (job.workAuthorization?.authorization !== filters.workAuthorization) {
+        return false;
+      }
+    }
+
+    // 6. International Opportunity Bucket Filter
+    if (filters.internationalBucket && filters.internationalBucket !== "ALL") {
+      if (job.internationalOpportunity?.bucket !== filters.internationalBucket) {
+        return false;
+      }
+    }
+
+    return true;
   });
 }

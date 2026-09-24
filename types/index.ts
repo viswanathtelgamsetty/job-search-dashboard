@@ -14,6 +14,83 @@ export type JobStatus = ApplicationStatus;
 
 export type RemoteType = "REMOTE" | "HYBRID" | "ONSITE";
 
+// ==========================================
+// Phase 7: Global / EMEA Market & International Opportunity Models
+// ==========================================
+
+export type MarketRegion =
+  | "INDIA"
+  | "EMEA"
+  | "NORTH_AMERICA"
+  | "APAC"
+  | "GLOBAL_REMOTE"
+  | "UNKNOWN";
+
+export type EmeaCountry =
+  | "UK"
+  | "IRELAND"
+  | "GERMANY"
+  | "NETHERLANDS"
+  | "FRANCE"
+  | "SPAIN"
+  | "SWITZERLAND"
+  | "SWEDEN"
+  | "NORWAY"
+  | "DENMARK"
+  | "FINLAND"
+  | "UAE"
+  | "SAUDI_ARABIA"
+  | "QATAR"
+  | "ISRAEL"
+  | "SOUTH_AFRICA"
+  | "OTHER_EMEA";
+
+export type OpportunityType =
+  | "INDIA_LOCAL"
+  | "INDIA_REMOTE"
+  | "INDIA_INTERNATIONAL"
+  | "INDIA_CLIENT_FACING"
+  | "INDIA_INTERNATIONAL_TRAVEL"
+  | "EMEA_LOCAL"
+  | "EMEA_REMOTE"
+  | "GLOBAL_REMOTE"
+  | "RELOCATION"
+  | "UNKNOWN";
+
+export type InternationalExposure =
+  | "NONE_MENTIONED"
+  | "INTERNATIONAL_TEAM"
+  | "INTERNATIONAL_CUSTOMERS"
+  | "CLIENT_SITE_TRAVEL"
+  | "INTERNATIONAL_TRAVEL"
+  | "RELOCATION"
+  | "UNKNOWN";
+
+export interface InternationalExposureDetail {
+  exposure: InternationalExposure;
+  evidence: string;
+}
+
+export type WorkAuthorization =
+  | "INDIA_ELIGIBLE"
+  | "REMOTE_LOCATION_RESTRICTED"
+  | "LOCAL_WORK_AUTH_REQUIRED"
+  | "SPONSORSHIP_AVAILABLE"
+  | "SPONSORSHIP_NOT_AVAILABLE"
+  | "UNKNOWN";
+
+export interface WorkAuthorizationDetail {
+  authorization: WorkAuthorization;
+  evidence: string;
+}
+
+export type ClientFacingStatus = "YES" | "NO" | "UNKNOWN";
+
+export interface ClientFacingDetail {
+  status: ClientFacingStatus;
+  evidence: string;
+}
+
 export type TravelType =
   | "INTERNATIONAL_TRAVEL"
   | "CLIENT_SITE_TRAVEL"
@@ -21,7 +98,35 @@ export type TravelType =
   | "REMOTE_GLOBAL"
   | "RELOCATION"
   | "NO_TRAVEL_MENTIONED"
+  | "TRAVEL_UNKNOWN"
+  | "OCCASIONAL_TRAVEL"
+  | "TRAVEL_10_20"
+  | "TRAVEL_20_30"
+  | "TRAVEL_30_PLUS"
   | "UNKNOWN";
+
+export type InternationalOpportunityBucket =
+  | "INTERNATIONAL_PRIORITY"
+  | "INTERNATIONAL_ACTIVE"
+  | "INTERNATIONAL_WATCH"
+  | "NOT_INTERNATIONAL";
+
+export interface InternationalOpportunityDimensions {
+  marketFit: { score: number; evidence: string };
+  customerExposure: { score: number; evidence: string };
+  travelOpportunity: { score: number; evidence: string };
+  clientFacing: { score: number; evidence: string };
+  indiaEligibility: { score: number; evidence: string };
+  workAuthorization: { score: number; evidence: string };
+  freshness: { score: number; evidence: string };
+}
+
+export interface InternationalOpportunity {
+  bucket: InternationalOpportunityBucket;
+  score: number; // 0-100 deterministic
+  reasons: string[];
+  dimensions: InternationalOpportunityDimensions;
+}
 
 export type NormalizedLocation =
   | "HYDERABAD"
@@ -48,6 +153,7 @@ export type TravelPercentageRange =
 
 export interface TravelDetails {
   type: TravelType;
+  travelCategory?: TravelType;
   percentage?: number;
   percentageRange?: TravelPercentageRange;
   destinations: string[];
@@ -277,6 +383,21 @@ export interface Job {
   opportunityPriorityReasons?: string[];
   match: JobMatchDetails;
 
+  // Phase 7: Global / EMEA Market & Opportunity classification
+  market?: MarketRegion;
+  emeaCountry?: EmeaCountry;
+  opportunityType?: OpportunityType;
+  opportunityTypes?: OpportunityType[];
+  internationalExposure?: InternationalExposureDetail;
+  workAuthorization?: WorkAuthorizationDetail;
+  clientFacingDetail?: ClientFacingDetail;
+  clientFacing?: ClientFacingStatus;
+  internationalOpportunity?: InternationalOpportunity;
+  isIndiaToEmea?: boolean;
+  isIndiaToEmeaReason?: string;
+  travelType?: TravelType;
+  travelEvidence?: string;
+
   // Application tracker details
   notes?: string;
   appliedAt?: string;
@@ -373,7 +494,9 @@ export type MarketRadarSection =
   | "TRAVEL"
   | "REMOTE_GLOBAL"
   | "HYDERABAD_INDIA"
-  | "ADJACENT";
+  | "ADJACENT"
+  | "EMEA_OPPORTUNITIES"
+  | "INDIA_TO_EMEA";
 
 export interface MarketRadarMetrics {
   totalJobs: number;
@@ -395,6 +518,16 @@ export interface MarketRadarMetrics {
   activeOpportunities: number;
   watchOpportunities: number;
   lowOpportunities: number;
+  // Phase 7 additions:
+  emeaOpportunities: number;
+  indiaToEmeaOpportunities: number;
+  northAmerica: number;
+  apac: number;
+  clientFacingCount: number;
+  internationalPriorityCount: number;
+  internationalActiveCount: number;
+  internationalWatchCount: number;
+  emeaCountryCounts: Record<string, number>;
 }
 
 export interface JobFiltersState {
@@ -414,10 +547,26 @@ export interface JobFiltersState {
   salaryState?: string;
   freshness?: string;
   postedWithinDays: number | null;
-  sortBy: "relevance" | "freshest" | "newest" | "travel" | "location" | "salary";
+  sortBy:
+    | "relevance"
+    | "freshest"
+    | "newest"
+    | "travel"
+    | "location"
+    | "salary"
+    | "international"
+    | "clientFacing"
+    | "market";
   section?: MarketRadarSection;
   opportunityPriority?: string;
   applicationTrackingFilter?: "ALL" | "SAVED" | "APPLIED" | "NEEDS_FOLLOW_UP";
+  // Phase 7 Filters:
+  market?: string;
+  emeaCountry?: string;
+  opportunityType?: string;
+  internationalExposure?: string;
+  workAuthorization?: string;
+  internationalBucket?: string;
 }
 
 export interface Application {
@@ -578,5 +727,10 @@ export interface MarketActivityMetrics {
   globalRemote: number;
   internationalTravel: number;
   clientSiteTravel: number;
+  // Phase 7 additions:
+  emea?: number;
+  indiaToEmea?: number;
+  clientFacing?: number;
+  internationalPriority?: number;
 }
 

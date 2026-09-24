@@ -24,6 +24,11 @@ import { calculateJobFreshness, detectDataQualityWarnings } from "@/lib/jobQuali
 import { deduplicateJobs, normalizeCompanyName, normalizeJobTitle } from "@/lib/deduplication";
 import { defaultSearchProfile } from "@/config/defaultProfile";
 import { calculateOpportunityPriority, getOpportunityPriorityReasons } from "@/lib/marketRadar";
+import { classifyMarketAndEmeaCountry } from "@/lib/marketClassifier";
+import { classifyWorkAuthorization } from "@/lib/workAuthorizationClassifier";
+import { classifyInternationalExposure, classifyClientFacing } from "@/lib/internationalExposure";
+import { classifyOpportunityTypes } from "@/lib/opportunityType";
+import { evaluateInternationalOpportunity } from "@/lib/internationalOpportunity";
 
 export class JobIngestionService {
   private providers: JobProvider[];
@@ -142,6 +147,35 @@ export class JobIngestionService {
             profile
           );
 
+          const fullJobText = `${raw.title} ${raw.location} ${raw.description || ""}`;
+          const marketResult = classifyMarketAndEmeaCountry(raw.location, raw.description);
+          const workAuthResult = classifyWorkAuthorization(raw.location, raw.description, indiaEligibility.isIndiaEligible);
+          const clientFacingResult = classifyClientFacing(raw.description || "", raw.title);
+          const intlExposureResult = classifyInternationalExposure(fullJobText, travel);
+          const oppTypeResult = classifyOpportunityTypes({
+            market: marketResult.market,
+            emeaCountry: marketResult.emeaCountry,
+            remoteType: raw.remoteType,
+            location: raw.location,
+            isIndiaEligible: indiaEligibility.isIndiaEligible,
+            travel,
+            internationalExposure: intlExposureResult,
+            clientFacingDetail: clientFacingResult,
+            text: raw.description,
+          });
+          const intlOppResult = evaluateInternationalOpportunity({
+            careerFit: match.careerFit || "POSSIBLE",
+            market: marketResult.market,
+            seniority: seniorityResult.level,
+            isIndiaEligible: indiaEligibility.isIndiaEligible,
+            internationalExposure: intlExposureResult,
+            clientFacingDetail: clientFacingResult,
+            travel,
+            workAuthorization: workAuthResult,
+            isIndiaToEmea: oppTypeResult.isIndiaToEmea,
+            freshnessStatus: freshness.freshness,
+          });
+
           const warnings = detectDataQualityWarnings({
             company: raw.company,
             location: raw.location,
@@ -151,6 +185,13 @@ export class JobIngestionService {
             currency: parsedSalary.currency,
             postedAt: raw.postedAt,
             source: raw.source,
+            description: raw.description,
+            seniority: seniorityResult.level,
+            workAuthorization: workAuthResult,
+            travel,
+            market: marketResult.market,
+            match,
+            postedDaysAgo: freshness.daysAgo,
           });
 
           const matchedTargets = match.breakdown.technologyMatch.details
@@ -203,6 +244,21 @@ export class JobIngestionService {
             careerFit: match.careerFit,
             opportunityPriority: calculateOpportunityPriority(match.careerFit || "POSSIBLE", freshness.freshness),
             opportunityPriorityReasons: getOpportunityPriorityReasons(match.careerFit || "POSSIBLE", freshness.freshness),
+
+            // Phase 7: Global & EMEA Opportunity Model
+            market: marketResult.market,
+            emeaCountry: marketResult.emeaCountry,
+            opportunityType: oppTypeResult.primary,
+            opportunityTypes: oppTypeResult.types,
+            internationalExposure: intlExposureResult,
+            workAuthorization: workAuthResult,
+            clientFacingDetail: clientFacingResult,
+            clientFacing: clientFacingResult.status,
+            internationalOpportunity: intlOppResult,
+            isIndiaToEmea: oppTypeResult.isIndiaToEmea,
+            isIndiaToEmeaReason: oppTypeResult.isIndiaToEmeaReason,
+            travelType: travel.travelCategory || travel.type,
+            travelEvidence: travel.evidence,
 
             // Raw source auditing (Requirement 7)
             sourceTitle: raw.sourceTitle || raw.title,

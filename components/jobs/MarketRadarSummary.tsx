@@ -386,6 +386,141 @@ export function MarketRadarSummary({
           <div className="text-[9px] text-amber-500">≤ 14 days ago</div>
         </button>
       </div>
+
+      {/* Row 4: International Opportunity Radar (Phase 7 Section 17) */}
+      <div className="rounded-xl border border-indigo-900/50 bg-indigo-950/20 p-3.5 space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-white uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <span>🌍 INTERNATIONAL OPPORTUNITY RADAR</span>
+            </span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400 text-[11px]">
+              Cross-border exposure, EMEA scope, client engagement & international mobility
+            </span>
+          </div>
+          {(filters.market !== "ALL" || filters.opportunityType !== "ALL" || filters.internationalBucket !== "ALL") && (
+            <button
+              onClick={() => onFilterChange({ market: "ALL", opportunityType: "ALL", internationalBucket: "ALL", emeaCountry: "ALL" })}
+              className="text-[11px] text-cyan-400 hover:underline"
+            >
+              Reset International Filters
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
+          {/* EMEA Opportunities */}
+          <button
+            onClick={() => onFilterChange({ market: filters.market === "EMEA" ? "ALL" : "EMEA" })}
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.market === "EMEA"
+                ? "border-purple-500 bg-purple-950/50 shadow-sm"
+                : "border-purple-900/40 bg-purple-950/20 hover:border-purple-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-purple-300">EMEA Roles</div>
+            <div className="mt-1 text-lg font-black text-purple-300">{metrics.emeaOpportunities}</div>
+            <div className="text-[9px] text-purple-400/80">UK, Europe & Middle East</div>
+          </button>
+
+          {/* India -> EMEA Roles */}
+          <button
+            onClick={() =>
+              onFilterChange({
+                opportunityType:
+                  filters.opportunityType === "INDIA_TO_EMEA" ? "ALL" : "INDIA_TO_EMEA",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.opportunityType === "INDIA_TO_EMEA"
+                ? "border-fuchsia-500 bg-fuchsia-950/50 shadow-sm"
+                : "border-fuchsia-900/40 bg-fuchsia-950/20 hover:border-fuchsia-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-fuchsia-300">India → EMEA</div>
+            <div className="mt-1 text-lg font-black text-fuchsia-300">{metrics.indiaToEmeaOpportunities}</div>
+            <div className="text-[9px] text-fuchsia-400/80">India base + EMEA scope</div>
+          </button>
+
+          {/* International Travel */}
+          <button
+            onClick={() =>
+              onFilterChange({
+                travelType:
+                  filters.travelType === "INTERNATIONAL_TRAVEL" ? "ALL" : "INTERNATIONAL_TRAVEL",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.travelType === "INTERNATIONAL_TRAVEL"
+                ? "border-indigo-500 bg-indigo-950/50 shadow-sm"
+                : "border-indigo-900/40 bg-indigo-950/20 hover:border-indigo-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-indigo-300">Intl Travel</div>
+            <div className="mt-1 text-lg font-black text-indigo-300">{metrics.internationalTravel}</div>
+            <div className="text-[9px] text-indigo-400/80">Cross-border travel</div>
+          </button>
+
+          {/* Client-Site Travel */}
+          <button
+            onClick={() =>
+              onFilterChange({
+                travelType:
+                  filters.travelType === "CLIENT_SITE_TRAVEL" ? "ALL" : "CLIENT_SITE_TRAVEL",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.travelType === "CLIENT_SITE_TRAVEL"
+                ? "border-cyan-500 bg-cyan-950/50 shadow-sm"
+                : "border-cyan-900/40 bg-cyan-950/20 hover:border-cyan-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-cyan-300">Client-Site Travel</div>
+            <div className="mt-1 text-lg font-black text-cyan-300">{metrics.clientSiteTravel}</div>
+            <div className="text-[9px] text-cyan-400/80">Customer onsite</div>
+          </button>
+
+          {/* Global Remote */}
+          <button
+            onClick={() =>
+              onFilterChange({
+                market: filters.market === "GLOBAL_REMOTE" ? "ALL" : "GLOBAL_REMOTE",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.market === "GLOBAL_REMOTE"
+                ? "border-sky-500 bg-sky-950/50 shadow-sm"
+                : "border-sky-900/40 bg-sky-950/20 hover:border-sky-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-sky-300">Global Remote</div>
+            <div className="mt-1 text-lg font-black text-sky-300">{metrics.globalRemote}</div>
+            <div className="text-[9px] text-sky-400/80">Worldwide hiring</div>
+          </button>
+
+          {/* International Priority Bucket */}
+          <button
+            onClick={() =>
+              onFilterChange({
+                internationalBucket:
+                  filters.internationalBucket === "INTERNATIONAL_PRIORITY"
+                    ? "ALL"
+                    : "INTERNATIONAL_PRIORITY",
+              })
+            }
+            className={`rounded-xl border p-2.5 transition text-left sm:text-center ${
+              filters.internationalBucket === "INTERNATIONAL_PRIORITY"
+                ? "border-emerald-500 bg-emerald-950/50 shadow-sm ring-1 ring-emerald-500/50"
+                : "border-emerald-900/40 bg-emerald-950/20 hover:border-emerald-700/60"
+            }`}
+          >
+            <div className="text-[10px] font-bold uppercase text-emerald-300">Intl Priority</div>
+            <div className="mt-1 text-lg font-black text-emerald-300">{metrics.internationalPriorityCount}</div>
+            <div className="text-[9px] text-emerald-400/80">Top global matches</div>
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

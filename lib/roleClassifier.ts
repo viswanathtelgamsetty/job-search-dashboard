@@ -83,10 +83,11 @@ export function classifyRoleFamily(
   }
 
   // 7. TECHNICAL_LEAD
+  const isNonTechnicalLead = /\b(account\s+management|key\s+account|sales|recruiting|hr\b|talent|marketing|operations|customer\s+support|finance|office)\b/i.test(t);
   if (
-    /\b(tech\s+lead|technical\s+lead|team\s+lead|lead\s+engineer|lead\s+developer|lead\s+software\s+engineer|lead\s+full\s*stack|lead\s+frontend)\b/i.test(
-      t
-    )
+    !isNonTechnicalLead &&
+    (/\b(tech\s+lead|technical\s+lead|lead\s+engineer|lead\s+developer|lead\s+software\s+engineer|lead\s+full\s*stack|lead\s+frontend)\b/i.test(t) ||
+      (/\b(team\s+lead)\b/i.test(t) && /\b(software|engineering|developer|frontend|backend|cloud|qa|tech|dev|platform)\b/i.test(combined)))
   ) {
     families.push("TECHNICAL_LEAD");
     evidence.push(`Title matches Technical Lead: "${title}"`);

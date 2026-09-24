@@ -255,6 +255,102 @@ export function JobCard({
               )}
             </div>
 
+            {/* Phase 7 Compact Badges Row (Section 23) */}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold tracking-wider uppercase">
+              {/* Career Fit */}
+              <span
+                className={`px-2 py-0.5 rounded border ${
+                  bucket === "HIGH_RELEVANCE"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : bucket === "RELEVANT"
+                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                    : bucket === "POSSIBLE"
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-slate-800 text-slate-400 border-slate-700"
+                }`}
+              >
+                {bucket === "HIGH_RELEVANCE" ? "HIGH" : bucket === "RELEVANT" ? "RELEVANT" : bucket === "POSSIBLE" ? "POSSIBLE" : "LOW"}
+              </span>
+
+              {/* Market */}
+              {job.market && job.market !== "UNKNOWN" && (
+                <span className="px-2 py-0.5 rounded border bg-purple-950/60 text-purple-300 border-purple-800/60">
+                  {job.market.replace(/_/g, " ")}
+                </span>
+              )}
+
+              {/* EMEA Country */}
+              {job.emeaCountry && (
+                <span className="px-2 py-0.5 rounded border bg-purple-900/40 text-purple-200 border-purple-700/50">
+                  {job.emeaCountry.replace(/_/g, " ")}
+                </span>
+              )}
+
+              {/* India -> EMEA Opportunity */}
+              {job.isIndiaToEmea && (
+                <span className="px-2 py-0.5 rounded border bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-600/70">
+                  INDIA → EMEA
+                </span>
+              )}
+
+              {/* Opportunity Type (if not India to EMEA) */}
+              {!job.isIndiaToEmea && job.opportunityType && job.opportunityType !== "UNKNOWN" && (
+                <span className="px-2 py-0.5 rounded border bg-slate-800/90 text-cyan-300 border-slate-700">
+                  {job.opportunityType.replace(/_/g, " ")}
+                </span>
+              )}
+
+              {/* Client Facing */}
+              {job.clientFacing === "YES" && (
+                <span className="px-2 py-0.5 rounded border bg-amber-950/70 text-amber-300 border-amber-700/60">
+                  CLIENT FACING
+                </span>
+              )}
+
+              {/* Travel */}
+              {job.travel?.percentage ? (
+                <span className="px-2 py-0.5 rounded border bg-indigo-950/70 text-indigo-300 border-indigo-700/60">
+                  {job.travel.percentage}% TRAVEL
+                </span>
+              ) : job.travel?.type === "INTERNATIONAL_TRAVEL" ? (
+                <span className="px-2 py-0.5 rounded border bg-indigo-950/70 text-indigo-300 border-indigo-700/60">
+                  INTL TRAVEL
+                </span>
+              ) : job.travel?.type === "CLIENT_SITE_TRAVEL" ? (
+                <span className="px-2 py-0.5 rounded border bg-cyan-950/70 text-cyan-300 border-cyan-700/60">
+                  CLIENT-SITE TRAVEL
+                </span>
+              ) : null}
+
+              {/* International Exposure */}
+              {job.internationalExposure?.exposure &&
+                !["NONE_MENTIONED", "UNKNOWN"].includes(job.internationalExposure.exposure) && (
+                  <span className="px-2 py-0.5 rounded border bg-sky-950/60 text-sky-300 border-sky-800/60">
+                    {job.internationalExposure.exposure.replace(/_/g, " ")}
+                  </span>
+                )}
+
+              {/* Seniority */}
+              {job.seniority && job.seniority !== "UNKNOWN" && (
+                <span className="px-2 py-0.5 rounded border bg-slate-800 text-slate-300 border-slate-700">
+                  {job.seniority}
+                </span>
+              )}
+
+              {/* Freshness */}
+              <span
+                className={`px-2 py-0.5 rounded border ${
+                  job.freshness === "FRESH"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : job.freshness === "RECENT"
+                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    : "bg-slate-800/80 text-slate-400 border-slate-700"
+                }`}
+              >
+                {job.freshness || "UNKNOWN"}
+              </span>
+            </div>
+
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-slate-300 font-medium">
               <span className="text-white font-semibold">{job.company}</span>
               <span className="text-slate-600">•</span>

@@ -48,8 +48,17 @@ export function classifyLocation(
     return "DELHI_NCR";
   }
 
-  // 2. India Remote vs Remote Global vs India Other
-  const isIndia = /\b(india|in)\b/i.test(loc);
+  // 2. Remote Global / Worldwide (Check before general India check)
+  if (
+    /\b(anywhere\s+in\s+the\s+world|worldwide|global|all regions|international remote|remote - global|any location|global remote)\b/i.test(
+      loc
+    )
+  ) {
+    return "REMOTE_GLOBAL";
+  }
+
+  // 3. India Remote vs Remote Global vs India Other
+  const isIndia = /\b(india)\b|[,/]\s*in\b/i.test(loc);
   const isRemote =
     remoteType === "REMOTE" ||
     /\b(remote|wfh|work from home|anywhere)\b/i.test(loc);
@@ -60,15 +69,6 @@ export function classifyLocation(
 
   if (isIndia) {
     return "INDIA_OTHER";
-  }
-
-  // 3. Remote Global / Worldwide
-  if (
-    /\b(anywhere|worldwide|global|all regions|international remote|remote - global|any location|global remote)\b/i.test(
-      loc
-    )
-  ) {
-    return "REMOTE_GLOBAL";
   }
 
   // 4. International Geographies
