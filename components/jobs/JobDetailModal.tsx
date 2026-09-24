@@ -121,6 +121,35 @@ export function JobDetailModal({
               <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
                 Source: {job.source}
               </span>
+
+              {/* Application Status Badge */}
+              {application ? (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border uppercase ${
+                    application.status === "SAVED"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                      : application.status === "APPLIED"
+                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
+                      : application.status === "SCREENING"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                      : application.status === "TECHNICAL"
+                      ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                      : application.status === "FINAL"
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                      : application.status === "OFFER"
+                      ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/50"
+                      : application.status === "REJECTED"
+                      ? "bg-red-500/20 text-red-300 border-red-500/30"
+                      : "bg-slate-800 text-slate-400 border-slate-700"
+                  }`}
+                >
+                  {application.status}
+                </span>
+              ) : job.status !== "DISCOVERED" ? (
+                <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
+                  {job.status}
+                </span>
+              ) : null}
             </div>
 
             <h2 id="radar-job-detail-title" className="text-xl sm:text-2xl font-black text-white tracking-tight">

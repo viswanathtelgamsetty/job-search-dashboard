@@ -502,7 +502,7 @@ export function JobCard({
           </button>
 
           {/* Mark as Applied */}
-          {job.status !== "APPLIED" && (
+          {!(application ? (application.status !== "SAVED" && application.status !== "DISCOVERED" && application.status !== "IGNORED") : job.status === "APPLIED") && (
             <button
               onClick={() => onStatusChange?.(job, "APPLIED")}
               className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-[11px] text-slate-400 hover:text-indigo-300 hover:border-indigo-800 transition"

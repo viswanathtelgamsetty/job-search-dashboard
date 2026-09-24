@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Application, ApplicationStatus, Job } from "@/types";
-import { markFollowUpDone, updateApplication, updateApplicationStatus } from "@/lib/applicationStore";
+import { markFollowUpDone, updateApplication } from "@/lib/applicationStore";
 
 interface ApplicationDetailModalProps {
   application: Application;
@@ -60,7 +60,17 @@ export function ApplicationDetailModal({
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   function handleSaveAll() {
+    const now = new Date().toISOString();
     const updates: Partial<Application> = {
+      status,
+      appliedAt:
+        status === "APPLIED" && !application.appliedAt
+          ? now
+          : application.appliedAt,
+      savedAt:
+        status === "SAVED" && !application.savedAt
+          ? now
+          : application.savedAt,
       resumeVersion: resumeVersion.trim() || undefined,
       coverLetterUsed: coverLetterUsed.trim() || undefined,
       referral,
@@ -78,13 +88,6 @@ export function ApplicationDetailModal({
       nextFollowUpAt: nextFollowUpDate ? `${nextFollowUpDate}T09:00:00.000Z` : undefined,
       interviewDates,
     };
-
-    if (status !== application.status) {
-      updateApplicationStatus(application.id, status, {
-        rejectionReason: updates.rejectionReason,
-        withdrawalReason: updates.withdrawalReason,
-      });
-    }
 
     const updated = updateApplication(application.id, updates);
     if (updated) {

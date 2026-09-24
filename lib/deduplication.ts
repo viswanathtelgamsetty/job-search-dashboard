@@ -82,14 +82,23 @@ export function deduplicateJobs(jobs: Job[]): Job[] {
           ? job.match
           : existing.match;
 
+      // Retain status, appliedAt, and existing canonical identity
+      const status = existing.status !== "DISCOVERED" ? existing.status : job.status;
+      const appliedAt = existing.appliedAt || job.appliedAt;
+
       map.set(fingerprint, {
         ...existing,
+        id: existing.id,
+        status,
+        appliedAt,
         salaryDisclosed,
         salaryLpaMin,
         salaryLpaMax,
         match: betterMatch,
         otherSources: combinedSources,
         skills: Array.from(new Set([...existing.skills, ...job.skills])),
+        opportunityPriority: existing.opportunityPriority || job.opportunityPriority,
+        opportunityPriorityReasons: existing.opportunityPriorityReasons || job.opportunityPriorityReasons,
       });
     }
   }

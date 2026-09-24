@@ -12,7 +12,7 @@ import {
   RemotiveJobProvider,
   type DiscoveredJobRaw,
   type JobProvider,
-} from "./job-providers";
+} from "./job-providers/index.ts";
 import { parseAndNormalizeSalary } from "@/lib/salaryParser";
 import { extractTravelDetails } from "@/lib/travelExtractor";
 import { classifyLocation, checkIndiaEligibility } from "@/lib/locationClassifier";
@@ -247,7 +247,7 @@ export class JobIngestionService {
     }
 
     const rawJobsCount = discoveredJobs.length;
-    const combined = [...discoveredJobs, ...existingJobs];
+    const combined = [...existingJobs, ...discoveredJobs];
     const deduplicated = deduplicateJobs(combined);
     const duplicatesCount = Math.max(0, combined.length - deduplicated.length);
     const finalJobsCount = deduplicated.length;

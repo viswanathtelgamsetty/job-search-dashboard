@@ -153,8 +153,10 @@ export function applyToJobAsApplication(job: Job): Application {
   const now = new Date().toISOString();
 
   if (existing) {
+    const shouldUpdateToApplied =
+      existing.status === "SAVED" || existing.status === "DISCOVERED";
     const updated = updateApplication(existing.id, {
-      status: "APPLIED",
+      status: shouldUpdateToApplied ? "APPLIED" : existing.status,
       appliedAt: existing.appliedAt || now,
       lastActivityAt: now,
     });

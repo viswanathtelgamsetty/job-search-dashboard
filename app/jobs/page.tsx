@@ -170,10 +170,14 @@ export default function MarketRadarPage() {
       // Application Pipeline Filter (All / Saved / Applied / Needs Follow-up)
       if (filters.applicationTrackingFilter === "SAVED") {
         const app = applicationsMap.get(job.id);
-        if (!app || app.status !== "SAVED") return false;
+        const isSaved = app ? app.status === "SAVED" : job.status === "SAVED";
+        if (!isSaved) return false;
       } else if (filters.applicationTrackingFilter === "APPLIED") {
         const app = applicationsMap.get(job.id);
-        if (!app || app.status === "SAVED" || app.status === "DISCOVERED") return false;
+        const isApplied = app
+          ? app.status !== "SAVED" && app.status !== "DISCOVERED" && app.status !== "IGNORED"
+          : job.status === "APPLIED";
+        if (!isApplied) return false;
       } else if (filters.applicationTrackingFilter === "NEEDS_FOLLOW_UP") {
         const app = applicationsMap.get(job.id);
         if (!app || !isFollowUpDue(app)) return false;
