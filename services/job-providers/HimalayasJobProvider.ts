@@ -116,8 +116,19 @@ export class HimalayasJobProvider implements JobProvider {
       roleFamily = "Senior Frontend Engineer";
     }
 
+    // Build a collision-free deterministic ID from the full externalId string.
+    // The old approach truncated a base64-encoded URL to 24 chars — since every
+    // Himalayas job URL starts with "https://himalayas.", they all produced the
+    // identical prefix "aHR0cHM6Ly9oaW1hbGF5YXMu", causing React key collisions.
+    // djb2 hash over the full string produces a unique 8-char hex fingerprint per job.
+    let h = 5381;
+    for (let i = 0; i < externalId.length; i++) {
+      h = ((h << 5) + h + externalId.charCodeAt(i)) >>> 0;
+    }
+    const jobHashId = h.toString(16).padStart(8, "0");
+
     return {
-      externalId: `himalayas-${Buffer.from(externalId).toString("base64").substring(0, 24)}`,
+      externalId: `himalayas-${jobHashId}`,
       title: job.title,
       company: job.companyName || "Unknown",
       location: locRestrictions,
