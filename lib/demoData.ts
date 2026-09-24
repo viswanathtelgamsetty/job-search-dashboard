@@ -2,6 +2,7 @@ import type { Job } from "@/types";
 import { evaluateJobMatch } from "./matchingEngine";
 import { classifyLocation } from "./locationClassifier";
 import { defaultSearchProfile } from "@/config/defaultProfile";
+import { calculateOpportunityPriority, getOpportunityPriorityReasons } from "./marketRadar";
 
 const rawDemoJobs: Array<
   Omit<
@@ -304,6 +305,8 @@ export const demoSeedJobs: Job[] = rawDemoJobs.map((raw) => {
     domains: match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER").map((d) => d.domain),
     domainMatches: match.domainMatches,
     careerFit: match.careerFit,
+    opportunityPriority: calculateOpportunityPriority(match.careerFit || "POSSIBLE", raw.freshness || "RECENT"),
+    opportunityPriorityReasons: getOpportunityPriorityReasons(match.careerFit || "POSSIBLE", raw.freshness || "RECENT"),
     match,
   };
 });

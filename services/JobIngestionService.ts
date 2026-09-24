@@ -23,6 +23,7 @@ import { extractActualJobTechnologies } from "@/lib/technologyMatcher";
 import { calculateJobFreshness, detectDataQualityWarnings } from "@/lib/jobQuality";
 import { deduplicateJobs, normalizeCompanyName, normalizeJobTitle } from "@/lib/deduplication";
 import { defaultSearchProfile } from "@/config/defaultProfile";
+import { calculateOpportunityPriority, getOpportunityPriorityReasons } from "@/lib/marketRadar";
 
 export class JobIngestionService {
   private providers: JobProvider[];
@@ -200,6 +201,8 @@ export class JobIngestionService {
             secondaryEvidenceDomains: match.secondaryEvidenceDomains || match.domainMatches.filter((d) => d.matched && d.domain !== "OTHER" && d.strength === "WEAK").map((d) => d.domain),
             domainMatches: match.domainMatches,
             careerFit: match.careerFit,
+            opportunityPriority: calculateOpportunityPriority(match.careerFit || "POSSIBLE", freshness.freshness),
+            opportunityPriorityReasons: getOpportunityPriorityReasons(match.careerFit || "POSSIBLE", freshness.freshness),
 
             // Raw source auditing (Requirement 7)
             sourceTitle: raw.sourceTitle || raw.title,
