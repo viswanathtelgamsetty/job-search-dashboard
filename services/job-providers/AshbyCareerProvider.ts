@@ -42,6 +42,9 @@ export class AshbyCareerProvider implements JobProvider {
     { token: "modal", name: "Modal", category: "developer_tools" },
     { token: "cohere", name: "Cohere", category: "enterprise_saas" },
     { token: "resend", name: "Resend", category: "developer_tools" },
+    { token: "httpie", name: "HTTPie", category: "developer_tools" },
+    { token: "gridverify", name: "Grid", category: "enterprise_saas" },
+    { token: "duck-duck-go", name: "DuckDuckGo", category: "developer_tools" },
   ];
 
   getBoardsQueried(): string[] {
