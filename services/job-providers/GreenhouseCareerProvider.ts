@@ -43,6 +43,7 @@ export class GreenhouseCareerProvider implements JobProvider {
     { token: "pagerduty", name: "PagerDuty", category: "enterprise_saas" },
     { token: "intercom", name: "Intercom", category: "enterprise_saas" },
     { token: "gusto", name: "Gusto", category: "enterprise_saas" },
+    { token: "tailscale", name: "Tailscale", category: "enterprise_saas" },
     { token: "affirm", name: "Affirm", category: "enterprise_saas" },
   ];
 
