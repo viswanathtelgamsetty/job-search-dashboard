@@ -141,7 +141,7 @@ export default function InternationalPage() {
                 onClick={() => (setter as (v: boolean) => void)(!(value as boolean))}
                 className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${value ? "border-indigo-500 bg-indigo-950 text-indigo-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}
               >
-                {value ? "✓ " : ""}{label}
+                {(value as boolean) ? "✓ " : ""}{label as string}
               </button>
             ))}
           </div>
