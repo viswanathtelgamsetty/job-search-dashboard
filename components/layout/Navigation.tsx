@@ -8,6 +8,7 @@ export function Navigation() {
 
   const links = [
     { href: "/jobs", label: "Market Radar", icon: "🧭", badge: "Primary" },
+    { href: "/international", label: "International", icon: "🌎", badge: "Daily" },
     { href: "/", label: "Dashboard", icon: "📊" },
     { href: "/applications", label: "Applications", icon: "📋" },
     { href: "/companies", label: "Target Companies", icon: "🏢" },
@@ -17,7 +18,6 @@ export function Navigation() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
-        {/* Brand / Logo */}
         <div className="flex items-center gap-3">
           <Link href="/jobs" className="flex items-center gap-2.5 group">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-500 font-bold text-white shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform">
@@ -40,7 +40,6 @@ export function Navigation() {
           </Link>
         </div>
 
-        {/* Navigation Tabs */}
         <nav className="flex items-center gap-1 sm:gap-2">
           {links.map((link) => {
             const isActive =
@@ -52,11 +51,9 @@ export function Navigation() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-all ${
-                  isActive
-                    ? "bg-slate-800 text-white shadow-sm shadow-slate-900 border border-slate-700/80"
-                    : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                }`}
+                className={`relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition-all ${isActive
+                  ? "bg-slate-800 text-white shadow-sm shadow-slate-900 border border-slate-700/80"
+                  : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"}`}
               >
                 <span>{link.icon}</span>
                 <span className="hidden sm:inline">{link.label}</span>
