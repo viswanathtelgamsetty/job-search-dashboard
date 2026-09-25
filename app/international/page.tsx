@@ -17,7 +17,7 @@ function isToday(value?: string) {
 function isRoleMatch(job: Job, roles: string[]) {
   const haystack = `${job.title} ${job.roleFamily} ${job.skills.join(" ")}`.toLowerCase();
   return roles.some((role) => {
-    const tokens = role.toLowerCase().split(/\\s+/).filter((t) => t.length > 3);
+    const tokens = role.toLowerCase().split(/\s+/).filter((t) => t.length > 3);
     return tokens.length > 0 && tokens.some((token) => haystack.includes(token));
   });
 }
